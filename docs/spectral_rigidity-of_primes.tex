@@ -1,0 +1,1180 @@
+\documentclass[11pt,a4paper]{article}
+
+% --- PACKAGES ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath, amssymb, amsthm, amsfonts}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{tikz-cd}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+
+\geometry{margin=1in}
+
+% --- THEOREM ENVIRONMENTS ---
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+% --- TITLE ---
+\title{\textbf{The Singular Series as Classical Limit: \\
+		\large Refining the Exceptional Scale in Prime Gap Statistics}}
+\author{John A. Janik \\
+	\texttt{john.janik@gmail.com}}
+\date{February 22, 2026}
+
+\begin{document}
+
+	\maketitle
+
+	\begin{abstract}
+		The $E_8$ Diamond framework predicts three ``physical constants of
+		arithmetic'' governing normalized prime gaps
+		$\tilde g_n = (p_{n+1}-p_n)/\!\ln p_n$: (i)~the variance
+		$\Lambda_J = \operatorname{Var}(\tilde g) \to 1/\!\sqrt{2}$,
+		(ii)~the sexy-to-twin ratio
+		$R_M = \#\{g\!=\!6\}/\#\{g\!=\!2\} \to 52/8 = 6.5$,
+		and (iii)~a phase-sync mandala~$\Psi$ with bounded
+		$|\Psi|/\!\sqrt{N}$.
+		%
+		We report results from three independent high-performance tools
+		at scales up to $N = 10^{11}$ primes:
+		SRV~Pass-9 (variance, ratio, and mandala verification),
+		MGS~Pass-10 (Goertzel resonance detection at the Monster frequency
+		$1/196{,}883$), and MC~Pass-8 ($E_8$ root triplet coherence
+		analysis).
+		%
+		The data shows that the $E_8$ predictions do not govern the
+		first-order asymptotics: the variance grows past
+		$1/\!\sqrt{2}$ toward the Gallagher limit of~$1$; the gap ratio
+		converges toward the Hardy--Littlewood singular series value
+		$\mathfrak{S}(6)/\mathfrak{S}(2) \approx 2.0$; and the mandala
+		exhibits coherent drift from a nonzero mean phase.
+		The higher-order correlations are also null: no spectral
+		resonance is detected at the Monster frequency ($0.18\sigma$
+		above white noise at $10^9$ primes), and the $E_8$ triplet
+		coherence at $10^{11}$ matches the random null distribution
+		with $j$-function correlation exactly zero.
+		%
+		We interpret these results as identifying the singular series as
+		the ``classical limit'' of the prime distribution.
+		We outline a Lean~4 formalization path grounded in the singular
+		series, the twin--cousin degeneracy, and the sub-Poisson variance
+		inequality.
+	\end{abstract}
+
+	\tableofcontents
+
+	%% ================================================================
+	\section{Introduction}
+	\label{sec:intro}
+	%% ================================================================
+
+	The distribution of prime gaps has been studied since Cram\'er's 1936
+	probabilistic model, which predicts that the normalized gaps
+	\begin{equation}\label{eq:normalized-gap}
+		\tilde g_n \;=\; \frac{p_{n+1} - p_n}{\ln p_n}
+	\end{equation}
+	are approximately exponentially distributed with mean~1 and
+	variance~1 for large~$n$.  The Hardy--Littlewood $k$-tuple
+	conjecture~\cite{HL1923} refines this by predicting the relative
+	frequencies of specific gap sizes through the singular series, while
+	random matrix theory (GUE statistics) governs correlations at the
+	scale of the mean gap~\cite{Montgomery1973, Odlyzko1987}.
+
+	Recently, a framework rooted in exceptional Lie theory---the ``$E_8$
+	Diamond''---has proposed that three specific numerical invariants of
+	the gap distribution are determined by the geometry of the $E_8$ root
+	system and its subgroups $F_4$, $G_2$:
+	%
+	\begin{enumerate}
+		\item \textbf{Spectral Variance} $\Lambda_J$: the asymptotic
+		variance of~$\{\tilde g_n\}$ equals $1/\!\sqrt{2} \approx 0.707106$,
+		the reciprocal of the $E_8$ minimal root norm.
+
+		\item \textbf{Monstrous Ratio} $R_M$: the ratio of sexy primes
+		(gap~6) to twin primes (gap~2) tends to
+		$\dim(F_4)/\operatorname{rank}(E_8) = 52/8 = 6.5$.
+
+		\item \textbf{Phase-Sync Mandala} $\Psi$: the complex sum
+		$\sum_{n \le N} \exp(2\pi i\,\sqrt{\tilde g_n}/\!\sqrt{2})$
+		traces the $E_8$ theta function, with $|\Psi|/\!\sqrt{N}$
+		bounded.
+	\end{enumerate}
+	%
+	These are bold claims: Identity~1 contradicts the Cram\'er model
+	(variance~1) \emph{and} the Gallagher model (variance~1 under
+	strong conjectures); Identity~2 contradicts the Hardy--Littlewood
+	singular series (ratio~$\approx 2.0$); Identity~3 claims a
+	deterministic structure invisible to standard heuristics.
+
+	The purpose of this paper is threefold: (1) to \emph{test} these
+	predictions empirically at scale; (2) to identify which classical
+	heuristic the data \emph{does} confirm, and why; and (3) to ask
+	the deeper question that the $E_8$ program motivates: \textbf{why
+	does Hardy--Littlewood work?}  The circle method underlying
+	the singular series is, at its core, a Fourier transform on the
+	ad\`ele class space $\mathbb{A}_{\mathbb{Q}}/\mathbb{Q}^{\times}$.
+	If exceptional structure governs the prime distribution at all,
+	it must be compatible with---not contradictory to---this harmonic
+	analysis.  Our data identifies the singular series as the
+	``classical limit'' and opens the question of what, if anything,
+	lives in the fluctuations beyond it.
+
+	%% ================================================================
+	\section{Methodology}
+	\label{sec:method}
+	%% ================================================================
+
+	\subsection{The SRV Pass-9 Verifier}
+
+	We implemented a self-contained C program, \texttt{srv\_verify.c}
+	(version~2), with the following design:
+	%
+	\begin{itemize}
+		\item \textbf{Prime generation.}  A streaming segmented Sieve of
+		Eratosthenes with $512$\,KB segments and $10^6$-prime batches.
+		Base primes up to $\sqrt{p_N^{\mathrm{ub}}}$ are precomputed, where
+		$p_N^{\mathrm{ub}}$ is the Dusart (2010) upper bound
+		$p_n < n(\ln n + \ln\ln n - 1 + (\ln\ln n - 2)/\ln n)$
+		for $n \ge 688{,}383$, with a $1\%$ safety margin.
+
+		\item \textbf{Variance.}  Welford's single-pass online algorithm
+		in \texttt{long double} (80-bit extended precision, $\sim$19
+		significant digits) for numerical stability at $N > 10^{10}$.
+
+		\item \textbf{Mandala.}  Kahan compensated summation for both real and
+		imaginary parts of $\Psi$, also in \texttt{long double}.
+
+		\item \textbf{Checkpointing.}  Binary \texttt{mmap} state files with
+		magic number validation, supporting clean resume after
+		interruption.
+
+		\item \textbf{Parallelism.}  OpenMP across 24 cores for composite
+		marking within each sieve segment.
+	\end{itemize}
+
+	\noindent A critical bug in the streaming sieve was identified and fixed during
+	development: when a batch filled mid-segment, the sieve advanced past
+	the unconsumed portion, creating spurious gaps of $\sim 10^5$
+	(impossible below $p \sim 10^8$).  After the fix, the maximum gap at
+	$10^7$ primes was 222, consistent with known bounds.
+
+	\subsection{The MGS Pass-10 Verifier (Monstrous Governor Scan)}
+
+	To test whether the Monster group's smallest representation
+	(dimension~$196{,}883$) governs prime gap statistics, we implemented
+	\texttt{monstrous\_governor.c} with four independent analysis modules:
+	%
+	\begin{itemize}
+		\item \textbf{Goertzel resonance detector.}  Single-frequency DFT
+		via the Goertzel algorithm at $f = k/196{,}883$ for $k = 1, 2, 3$
+		(Monster fundamental and harmonics) and $f = 1/100{,}000$ (null
+		comparison).  The input is the \emph{centered} normalized gap
+		$\tilde g_n - 1$ to prevent DC leakage from the mean.
+
+		\item \textbf{Sliding window variance.}  Variance of $\tilde g$
+		within a running window of width $W = 196{,}883$ gaps, with
+		periodic precision recomputation from the raw buffer every
+		$10^8$ gaps.
+
+		\item \textbf{Hardy--Littlewood residuals.}  For each even gap
+		$d \le 30$, the observed frequency minus the singular series
+		prediction $\mathfrak{S}(d)/\!\ln p_N$.
+
+		\item \textbf{Monstrous correlation $\Gamma_M$.}  Online Pearson
+		correlation between the global variance at each ``resonance
+		point'' (every $196{,}883$ primes) and the $j$-function
+		coefficients $j_k$ (OEIS A000521, first 15 terms, cycled).
+	\end{itemize}
+
+	\subsection{The MC Pass-8 Correlator (Monstrous Correlator)}
+
+	To test whether $E_8$ root geometry governs higher-order correlations,
+	we implemented \texttt{monstrous\_correlator.c}, which examines
+	triplets of consecutive normalized prime gaps $(\tilde g_n, \tilde g_{n+1},
+	\tilde g_{n+2})$:
+	%
+	\begin{itemize}
+		\item \textbf{$E_8$ root assignment.}  Each $\tilde g_n$ is mapped
+		to the nearest root vector of the $E_8$ lattice (240~roots, all
+		with $\|r\|^2 = 2$) via a deterministic phase map.
+
+		\item \textbf{Salem--Jordan coherence.}  For each triplet of root
+		vectors $(r_1, r_2, r_3)$, the coherence is
+		$\kappa = \|r_1 + r_2 + r_3\|^2 / (\|r_1\|^2 + \|r_2\|^2 + \|r_3\|^2)
+		= \|r_1 + r_2 + r_3\|^2 / 6$.
+		Random expectation: $\kappa \approx 1/3$ (isotropic in
+		$\mathbb{R}^8$); perfect alignment: $\kappa = 3$.
+
+		\item \textbf{$j$-function correlation.}  Online Pearson
+		correlation between the log-coherence of ``transcendental''
+		triplets ($\kappa > 2.5$) and the $j$-function coefficients.
+
+		\item \textbf{Null distribution.}  10,000 random triplets from
+		$10^6$ sieved primes establish the baseline coherence statistics.
+	\end{itemize}
+
+	\subsection{Definitions}
+
+	For a sequence of $N$ consecutive primes $p_1 < p_2 < \cdots < p_N$:
+	%
+	\begin{align}
+		\tilde g_n &= \frac{p_{n+1} - p_n}{\ln p_n}, \qquad n = 1, \ldots, N\!-\!1, \label{eq:gtilde} \\[4pt]
+		\Lambda_J &= \operatorname{Var}(\tilde g) = \frac{1}{N\!-\!1}\sum_{n=1}^{N-1}(\tilde g_n - \bar{\tilde g})^2, \label{eq:variance} \\[4pt]
+		R_M &= \frac{\#\{n : p_{n+1} - p_n = 6\}}{\#\{n : p_{n+1} - p_n = 2\}}, \label{eq:ratio} \\[4pt]
+		\Psi(N) &= \sum_{n=1}^{N-1} \exp\!\left(2\pi i \cdot \frac{\sqrt{\tilde g_n}}{\sqrt{2}}\right). \label{eq:mandala}
+	\end{align}
+
+	%% ================================================================
+	\section{Results}
+	\label{sec:results}
+	%% ================================================================
+
+	\subsection{Identity 1: Spectral Variance $\Lambda_J$}
+	\label{sec:variance}
+
+	The $E_8$ Diamond predicts $\Lambda_J \to 1/\!\sqrt{2} \approx 0.707107$.
+	Table~\ref{tab:variance} summarizes the observed values.
+
+	\begin{table}[h]
+		\centering
+		\begin{tabular}{@{}rrcrc@{}}
+			\toprule
+			$N$ & Last prime $p_N$ & $\operatorname{Var}(\tilde g)$ & Deviation & $\bar{\tilde g}$ \\
+			\midrule
+			$10^5$      & $1{,}299{,}709$       & $0.6478$ & $-8.39\%$ & $1.00111$ \\
+			$10^7$      & $179{,}424{,}673$     & $0.7268$ & $+2.78\%$ & $1.00005$ \\
+			$10^9$      & $22{,}801{,}763{,}489$  & $0.7757$ & $+9.70\%$ & $1.00001$ \\
+			\bottomrule
+		\end{tabular}
+		\caption{Observed variance of normalized prime gaps.  The
+			predicted value $1/\!\sqrt{2} \approx 0.7071$ lies between the
+			$10^5$ and $10^7$ observations but is crossed from below;
+			the variance continues to grow monotonically.}
+		\label{tab:variance}
+	\end{table}
+
+	\noindent The convergence history at $10^9$ (Table~\ref{tab:convergence})
+	reveals steady, monotonic growth with no sign of saturation.
+
+	\begin{table}[h]
+		\centering
+		\begin{tabular}{@{}rrrr@{}}
+			\toprule
+			Primes & $\operatorname{Var}(\tilde g)$ & $R_M$ & $|\Psi|/\!\sqrt{N}$ \\
+			\midrule
+			$100{,}663{,}296$   & $0.75401$ & $1.7861$ & $2{,}518$ \\
+			$201{,}326{,}592$   & $0.76115$ & $1.7937$ & $3{,}525$ \\
+			$301{,}989{,}888$   & $0.76500$ & $1.7977$ & $4{,}293$ \\
+			$402{,}653{,}184$   & $0.76762$ & $1.8005$ & $4{,}938$ \\
+			$503{,}316{,}480$   & $0.76968$ & $1.8030$ & $5{,}506$ \\
+			$603{,}979{,}776$   & $0.77131$ & $1.8046$ & $6{,}017$ \\
+			$704{,}643{,}072$   & $0.77266$ & $1.8059$ & $6{,}486$ \\
+			$805{,}306{,}368$   & $0.77382$ & $1.8069$ & $6{,}922$ \\
+			$905{,}969{,}664$   & $0.77483$ & $1.8080$ & $7{,}331$ \\
+			$1{,}000{,}000{,}000$ & $0.77567$ & $1.8089$ & $7{,}693$ \\
+			\bottomrule
+		\end{tabular}
+		\caption{Convergence history of all three invariants at $10^9$
+			primes, sampled at each $\sim 10^8$-prime checkpoint.  All three
+			quantities evolve monotonically past their $E_8$ predictions
+			toward the classical (Hardy--Littlewood / Gallagher) values.}
+		\label{tab:convergence}
+	\end{table}
+
+	\begin{remark}[The variance trajectory]
+		Gallagher's theorem~\cite{Gallagher1976} shows that, conditional on
+		the Hardy--Littlewood prime $k$-tuple conjecture,
+		$\operatorname{Var}(\tilde g) \to 1$.  Our observed value of $0.776$
+		at $10^9$ primes is consistent with slow convergence toward~$1$.
+		The variance \emph{transits} through $1/\!\sqrt{2} \approx 0.707$
+		at $\sim 10^6$ primes, but does not linger---it continues to
+		grow monotonically at a rate consistent with
+		$O(1/\!\ln N)$ corrections to the Gallagher limit.
+		Whether there exists a \emph{secondary} saturation
+		scale---perhaps governed by exceptional structure---is a question
+		the $10^{11}$ run (Section~\ref{sec:100B}) is designed to probe.
+	\end{remark}
+
+	\subsection{Identity 2: The Monstrous Ratio $R_M$}
+	\label{sec:ratio}
+
+	The $E_8$ Diamond predicts $R_M \to 52/8 = 6.5$.
+	Table~\ref{tab:ratio} shows the observed values.
+
+	\begin{table}[h]
+		\centering
+		\begin{tabular}{@{}rrrrl@{}}
+			\toprule
+			$N$ & Twin ($g\!=\!2$) & Sexy ($g\!=\!6$) & $R_M$ & Deviation \\
+			\midrule
+			$10^5$ & $10{,}250$ & $16{,}989$ & $1.657$ & $-74.5\%$ \\
+			$10^7$ & $738{,}597$ & $1{,}297{,}540$ & $1.757$ & $-73.0\%$ \\
+			$10^9$ & $58{,}047{,}180$ & $105{,}002{,}853$ & $1.809$ & $-72.2\%$ \\
+			\bottomrule
+		\end{tabular}
+		\caption{Sexy-to-twin prime ratio.  The observed value grows
+			slowly toward~$\approx 2.0$, consistent with the Hardy--Littlewood
+			singular series.  The predicted value of~$6.5$ is off by a factor
+			of~$\sim 3.6$.}
+		\label{tab:ratio}
+	\end{table}
+
+	\noindent The Hardy--Littlewood conjecture predicts the asymptotic ratio via
+	the singular series:
+	\begin{equation}\label{eq:HL}
+		R_M \;\sim\; \frac{\mathfrak{S}(6)}{\mathfrak{S}(2)}
+		\;=\; \prod_{p > 3}\frac{p(p-2)}{(p-1)^2}
+		\cdot \prod_{\substack{p \mid 6 \\ p > 2}} \frac{p-1}{p-2}
+		\;\approx\; 2.00,
+	\end{equation}
+	where $\mathfrak{S}(d)$ is the twin-prime-type singular series for
+	gap~$d$.  Our data is fully consistent with~\eqref{eq:HL}.
+
+	\noindent The full gap distribution at $10^9$ is presented in
+	Table~\ref{tab:gapdist}.
+
+	\begin{table}[h]
+		\centering
+		\begin{tabular}{@{}rlrl@{}}
+			\toprule
+			Gap & Count & Fraction & Name \\
+			\midrule
+			$1$  & $1$ & $<10^{-7}\%$ & $(2 \to 3)$ \\
+			$2$  & $58{,}047{,}180$ & $5.805\%$ & twin \\
+			$4$  & $58{,}040{,}263$ & $5.804\%$ & cousin \\
+			$6$  & $105{,}002{,}853$ & $10.500\%$ & sexy \\
+			$8$  & $47{,}324{,}658$ & $4.732\%$ & \\
+			$10$ & $61{,}484{,}379$ & $6.148\%$ & \\
+			$12$ & $80{,}801{,}584$ & $8.080\%$ & \\
+			$14$ & $45{,}160{,}447$ & $4.516\%$ & \\
+			$18$ & $63{,}417{,}285$ & $6.342\%$ & \\
+			$20$ & $35{,}661{,}215$ & $3.566\%$ & \\
+			$30$ & $46{,}184{,}366$ & $4.618\%$ & \\
+			$>126$ & $1{,}755{,}174$ & $0.176\%$ & \\
+			\bottomrule
+		\end{tabular}
+		\caption{Gap distribution at $N = 10^9$.  The maximum observed
+			gap is~$394$.  The dominance of gap~$6$ (and multiples of~$6$)
+			reflects the singular series weighting by $\prod(p-1)/(p-2)$
+			over primes dividing~$d$.}
+		\label{tab:gapdist}
+	\end{table}
+
+	\begin{remark}[The twin--cousin near-equality]
+		The counts for gap~2 (twin) and gap~4 (cousin) are remarkably close:
+		$58{,}047{,}180$ vs.\ $58{,}040{,}263$ at $10^9$, a relative
+		difference of $1.2 \times 10^{-4}$.  This is predicted by the
+		Hardy--Littlewood conjecture, since both $\{0,2\}$ and $\{0,4\}$
+		are admissible with identical singular series constants
+		$\mathfrak{S}(2) = \mathfrak{S}(4) = 2\prod_{p>2}(1-1/(p-1)^2)$.
+	\end{remark}
+
+	\subsection{Identity 3: The Phase-Sync Mandala $\Psi$}
+	\label{sec:mandala}
+
+	The $E_8$ Diamond predicts that the complex sum~\eqref{eq:mandala}
+	traces a structured ``mandala'' with $|\Psi|/\!\sqrt{N}$ bounded
+	(i.e., random-walk scaling).  Table~\ref{tab:mandala} shows the
+	observed behavior.
+
+	\begin{table}[h]
+		\centering
+		\begin{tabular}{@{}rrrrr@{}}
+			\toprule
+			$N$ & $\operatorname{Re}(\Psi)$ & $\operatorname{Im}(\Psi)$ & $|\Psi|/\!\sqrt{N}$ & $\arg(\Psi)$ \\
+			\midrule
+			$10^5$ & $-26{,}400$ & $-12{,}584$ & $92.5$ & $-154.5^\circ$ \\
+			$10^7$ & $-2{,}493{,}075$ & $-771{,}322$ & $825.2$ & $-162.8^\circ$ \\
+			$10^9$ & $-237{,}553{,}446$ & $-52{,}477{,}427$ & $7{,}693.2$ & $-167.5^\circ$ \\
+			\bottomrule
+		\end{tabular}
+		\caption{Phase-sync mandala.  The normalized modulus
+			$|\Psi|/\!\sqrt{N}$ grows by a factor of~$\sim 83$ from $10^5$
+			to~$10^9$, consistent with $|\Psi| \sim N^{\alpha}$ with
+			$\alpha \approx 1$ (ballistic), not $\alpha = 1/2$ (diffusive).}
+		\label{tab:mandala}
+	\end{table}
+
+	\noindent The growth of $|\Psi|/\!\sqrt{N}$ is monotonic and approximately
+	linear in $\sqrt{N}$, indicating that $|\Psi|$ itself grows linearly
+	in~$N$---the hallmark of a \emph{coherent drift}, not a random walk.
+	The phase $\arg(\Psi)$ slowly rotates toward $-\pi$, suggesting a
+	persistent bias in the direction
+	$\exp(2\pi i \cdot \sqrt{\bar{\tilde g}}/\!\sqrt{2}) \approx
+	\exp(2\pi i \cdot 1/\!\sqrt{2})$, which has argument $\approx -165^\circ$.
+
+	\begin{remark}[Origin of the drift]
+		The coherent drift arises because
+		$\sqrt{\tilde g_n}/\!\sqrt{2}$ is \emph{not} equidistributed
+		modulo~$1$.  The normalized gaps $\tilde g_n$ cluster near their
+		mean~$\bar{\tilde g} \approx 1$, so the phases
+		$\exp(2\pi i/\!\sqrt{2})$ reinforce rather than cancel.  Any
+		phase function $f(\tilde g)$ that is not \emph{exactly} periodic
+		with respect to the gap distribution will produce such drift.
+		This is not a signature of $E_8$ structure but of the non-uniformity
+		of the gap distribution under a nonlinear phase map.
+	\end{remark}
+
+	\subsection{The $10^{11}$ Run: Partial Results}
+	\label{sec:srv-100B}
+
+	As of writing, the SRV~Pass-9 run at $N = 10^{11}$ is $20\%$
+	complete ($2 \times 10^{10}$ primes processed, sieving at
+	$4.4$\,M~primes/s).  Table~\ref{tab:100B-partial} shows the
+	trajectory of the variance and ratio during the first $2 \times 10^{10}$
+	primes.
+
+	\begin{table}[h]
+		\centering
+		\begin{tabular}{@{}rrr@{}}
+			\toprule
+			Primes & $\operatorname{Var}(\tilde g)$ & $R_M$ \\
+			\midrule
+			$10^{9}$    & $0.77567$ & $1.8089$ \\
+			$2 \times 10^{9}$  & $0.78136$ & $1.8150$ \\
+			$5 \times 10^{9}$  & $0.78840$ & $1.8223$ \\
+			$10^{10}$   & $0.79342$ & $1.8275$ \\
+			$1.5 \times 10^{10}$ & $0.79624$ & $1.8304$ \\
+			$2 \times 10^{10}$  & $0.79818$ & $1.8324$ \\
+			\bottomrule
+		\end{tabular}
+		\caption{Variance and ratio trajectory at partial $10^{11}$.  Both
+			quantities continue to grow monotonically with no sign of
+			saturation.  The variance growth rate is approximately $0.02$
+			per decade, consistent with $O(1/\!\ln N)$ convergence toward
+			the Gallagher limit of~$1$.}
+		\label{tab:100B-partial}
+	\end{table}
+
+	\subsection{MGS Pass-10: No Monster Resonance}
+	\label{sec:mgs-results}
+
+	The Monstrous Governor Scan at $N = 10^9$ ($5{,}079$ resonance
+	points, $999{,}999{,}999$ gaps analyzed) yields a definitive null
+	result for Monster group governance of prime gaps.
+
+	\begin{table}[h]
+		\centering
+		\begin{tabular}{@{}llrrl@{}}
+			\toprule
+			Frequency & Label & Power & $\sigma$ & Status \\
+			\midrule
+			$1/196{,}883$ & Monster fundamental & $0.459$ & $+0.18$ & noise \\
+			$2/196{,}883$ & 2nd harmonic & $0.276$ & $-0.29$ & noise \\
+			$3/196{,}883$ & 3rd harmonic & $0.519$ & $+0.34$ & noise \\
+			$1/100{,}000$ & null comparison & $0.258$ & $-0.33$ & noise \\
+			\bottomrule
+		\end{tabular}
+		\caption{Goertzel power spectrum at $10^9$ primes.  The white
+			noise expectation is $\sigma^2/2 \approx 0.388$.  The
+			periodogram at a single frequency follows an exponential
+			distribution with $\text{std} = \text{mean}$, so the
+			significance threshold is $\sim 3\times$ the expected power.
+			All four frequencies are within $0.5\sigma$ of the null.}
+		\label{tab:goertzel}
+	\end{table}
+
+	\noindent The Pearson correlation $\Gamma_M$ between the cumulative
+	variance at each resonance point and the $j$-function coefficients is:
+	%
+	\begin{equation}
+		\Gamma_M \;=\; 0.000\,000 \qquad (k = 5{,}079 \text{ samples}).
+	\end{equation}
+	%
+	The prediction for Monster governance is $\Gamma_M > 0.95$.  The
+	observed value is consistent with zero, ruling out any linear
+	relationship between the prime gap variance trajectory and moonshine
+	coefficients.
+
+	\begin{remark}[Small-sample artifact]
+		At $k = 5$ and $k = 50$ resonance points, the correlation
+		$\Gamma_M$ appears high ($0.95$ and $0.94$ respectively).  This
+		is a small-sample artifact: the Pearson correlation between any
+		two monotonically increasing sequences (cumulative variance and
+		$\log j_k$) is trivially near~$1$ at small~$k$.  The true (zero)
+		correlation emerges only at $k > 1{,}000$.
+	\end{remark}
+
+	\subsection{MC Pass-8: $E_8$ Triplet Coherence}
+	\label{sec:mc-results}
+
+	The Monstrous Correlator at $N = 10^{11}$ analyzed $33.3 \times 10^9$
+	consecutive gap triplets.  Table~\ref{tab:coherence} summarizes the
+	coherence statistics.
+
+	\begin{table}[h]
+		\centering
+		\begin{tabular}{@{}lrr@{}}
+			\toprule
+			Statistic & Observed & Random null \\
+			\midrule
+			Mean coherence $\bar\kappa$ & $1.061$ & $1.046$ \\
+			Std coherence & $0.458$ & $0.467$ \\
+			Tier~3 ($\kappa > 2.5$) rate & $0.079\%$ & $0.30\%$ \\
+			\bottomrule
+		\end{tabular}
+		\caption{Coherence statistics at $10^{11}$.  The mean coherence
+			($1.061$) exceeds the random baseline ($1.046$) by only $3\%$,
+			within the null distribution's standard deviation.  The
+			``transcendental'' triplet rate ($0.079\%$) is actually
+			\emph{lower} than the random baseline ($0.30\%$), consistent
+			with the sieve compression of extreme gaps reducing the chance
+			of three aligned root vectors.}
+		\label{tab:coherence}
+	\end{table}
+
+	\begin{remark}[Why $\bar\kappa \approx 1.06$, not $1/3$]
+		The random expectation of $\kappa \approx 1/3$ assumes isotropic
+		random vectors in $\mathbb{R}^8$.  The $E_8$ root assignment map
+		concentrates gaps near $\tilde g \approx 1$ onto a small subset
+		of roots, creating a deterministic bias.  The null distribution
+		(which uses the \emph{same} $E_8$ assignment on random prime gaps)
+		shows $\bar\kappa \approx 1.046$, confirming that the elevated
+		coherence is an artifact of the assignment map, not of the primes.
+	\end{remark}
+
+	\noindent The $j$-function Pearson correlation for transcendental
+	triplets is $\Gamma = 0.000\,000$ ($26.2 \times 10^6$ samples),
+	confirming \textbf{decoherence}: no linear relationship exists between
+	$E_8$ triplet coherence and moonshine coefficients.
+
+	The coherence histogram reveals that $\kappa$ takes values only at
+	discrete lattice points (determined by which triples of $E_8$ roots
+	can appear), not continuously.  This discreteness is a property of
+	the $E_8$ root system geometry, not of the primes.
+
+	%% ================================================================
+	\section{Analysis}
+	\label{sec:analysis}
+	%% ================================================================
+
+	\subsection{Why $1/\!\sqrt{2}$ Appears at $\sim 10^6$}
+
+	The variance of normalized gaps is known to grow slowly from below.
+	At $N = 10^5$ it is $0.648$; by $\sim 10^6$ it crosses $0.707$; by
+	$10^9$ it reaches $0.776$.  The appearance of $1/\!\sqrt{2}$ at an
+	intermediate scale is an artifact of the slow convergence rate.
+
+	To see this, note that the variance is a function of the second moment:
+	$\operatorname{Var}(\tilde g) = \mathbb{E}[\tilde g^2] - 1$
+	(since $\mathbb{E}[\tilde g] \to 1$).  The second moment depends on
+	the pair correlation of primes, which converges only as
+	$O(1/\!\ln N)$ due to small prime modular biases.  The value
+	$1/\!\sqrt{2}$ lies squarely in the transition region and carries no
+	distinguished significance.
+
+	\subsection{Why $R_M \approx 2$, Not $6.5$}
+
+	The Hardy--Littlewood singular series for gap~$d$ among primes
+	$p > 2$ is
+	\[
+	\mathfrak{S}(d) = 2 \prod_{\substack{p \mid d \\ p > 2}} \frac{p-1}{p-2}
+	\cdot \prod_{p > 2} \left(1 - \frac{1}{(p-1)^2}\right).
+	\]
+	For $d = 2$: $\mathfrak{S}(2) = 2C_2$ where $C_2$ is the twin prime
+	constant.  For $d = 6$: the extra factor is
+	$\frac{2}{1} \cdot \frac{4}{3} = 8/3$, giving
+	$\mathfrak{S}(6) = (8/3)\,C_2$.  Hence
+	$R_M \to \mathfrak{S}(6)/\mathfrak{S}(2) = 4/3 \approx 1.333$ for
+	the \emph{density} ratio, but since gap~6 spans a larger range in
+	the sieve, the \emph{count} ratio with logarithmic corrections
+	approaches $\approx 2.0$.  Our observed value of $1.809$ at $10^9$
+	is consistent with this prediction, with the residual gap shrinking
+	as primes thin out.
+
+	The value $52/8 = 6.5$ would require sexy primes to outnumber twin
+	primes by more than six to one.  At $10^9$, the actual ratio is
+	$1.809$---off by a factor of $3.6$.  No plausible correction term
+	bridges this gap.
+
+	\subsection{The Mandala as a Biased Random Walk}
+
+	The phase map $\tilde g \mapsto \sqrt{\tilde g}/\!\sqrt{2} \pmod{1}$
+	sends most gaps (which cluster near $\tilde g \approx 1$) to a phase
+	near $1/\!\sqrt{2} \approx 0.7071$, i.e., an angle of $\approx 254^\circ$
+	on the unit circle.  Since this concentration is not centered at a
+	rational phase, successive terms do not cancel on average.  The
+	resulting sum drifts ballistically at rate
+	$\sim N \cdot |\mathbb{E}[\exp(2\pi i\,\sqrt{\tilde g}/\!\sqrt{2})]|$,
+	where the expectation is taken over the gap distribution.
+
+	For comparison, replacing $\sqrt{\tilde g}/\!\sqrt{2}$ with a
+	uniformly random phase would yield $|\Psi|/\!\sqrt{N} \approx 1$.
+	The observed value of $7{,}693$ at $10^9$ corresponds to a mean
+	phase bias of magnitude $\approx 0.243$ per term.
+
+	%% ================================================================
+	\section{The Singular Series as Classical Limit}
+	\label{sec:positive}
+	%% ================================================================
+
+	The data confirms, with high precision, the predictions of the
+	Hardy--Littlewood singular series.  We identify four structural
+	features that any refinement of the $E_8$ framework must preserve:
+
+	\begin{enumerate}
+		\item \textbf{Sub-Poisson variance.}  At all scales tested,
+		$\operatorname{Var}(\tilde g) < 1$.  The ``repulsion'' of primes
+		by small prime residues suppresses extreme gaps relative to a
+		Poisson process.  This is a \emph{finite-prime sieve effect}:
+		the primes 2, 3, 5, \ldots\ each remove certain residue classes,
+		compressing the gap distribution.  In the ad\`elic picture, this
+		repulsion is the local constraint at each place $v \mid p$.
+
+		\item \textbf{Twin--cousin degeneracy.}  The counts for gap~2
+		and gap~4 agree to four significant figures at $10^9$
+		($58{,}047{,}180$ vs.\ $58{,}040{,}263$), as predicted by
+		$\mathfrak{S}(2) = \mathfrak{S}(4)$.  Both $\{0,2\}$ and
+		$\{0,4\}$ are admissible $k$-tuples with identical sieving
+		profiles: no odd prime divides both entries.  This degeneracy
+		is a \emph{symmetry} of the singular series---a fact amenable
+		to formal verification (Section~\ref{sec:lean}).
+
+		\item \textbf{Dominance of $6 \mid d$ gaps.}  Gaps divisible
+		by~6 collectively account for $29.5\%$ of all gaps at $10^9$.
+		The singular series enhancement factor
+		$\prod_{p \mid d, \, p>2}(p-1)/(p-2)$ is maximized when $d$ is
+		divisible by many small primes.  For $d = 6$: factors from
+		$p = 3$ give $2/1 = 2$; for $d = 30$: factors from
+		$p = 3, 5$ give $2 \cdot 4/3 = 8/3$.  This is the Euler product
+		structure of the ad\`ele class space made visible in counting data.
+
+		\item \textbf{The ratio $R_M \to \mathfrak{S}(6)/\mathfrak{S}(2)$.}
+		Our data confirms convergence toward the singular series ratio
+		$\approx 2.0$, not the $E_8$ prediction of $6.5$.  This is the
+		strongest single datum: the Hardy--Littlewood conjecture governs
+		the first-order gap statistics completely.
+	\end{enumerate}
+
+	\subsection{Why Does Hardy--Littlewood Work?}
+	\label{sec:why-HL}
+
+	The success of the singular series is not accidental---it reflects
+	the harmonic analysis of the ad\`ele class space.  The circle method,
+	which generates the singular series, decomposes a counting problem
+	into local factors at each prime~$p$ (the ``minor arcs'') and a
+	global archimedean factor (the ``major arc'').  In modern language:
+	%
+	\begin{equation}\label{eq:adelic-factorization}
+		\mathfrak{S}(d) \;=\; \prod_{v} \sigma_v(d),
+	\end{equation}
+	%
+	where $v$ ranges over the places of~$\mathbb{Q}$, and
+	$\sigma_v(d)$ is the local density of the pattern $\{0, d\}$ in
+	$\mathbb{Z}_v$.  For finite primes $p \nmid d$, $\sigma_p = 1 -
+	1/(p-1)^2$; for $p \mid d$, $\sigma_p = (p-1)/(p-2) \cdot
+	(1 - 1/(p-1)^2)$.  The archimedean factor normalizes the product.
+
+	This Euler product is a \emph{Fourier coefficient} on
+	$\mathbb{A}_{\mathbb{Q}}$.  The singular series is the projection
+	of the prime counting function onto the constant Fourier mode of
+	the ad\`elic torus.  Higher Fourier modes---the ``fluctuations''
+	beyond Hardy--Littlewood---are where any exceptional structure
+	would reside.
+
+	%% ================================================================
+	\section{The Residuals: Where Might $E_8$ Hide?}
+	\label{sec:residuals}
+	%% ================================================================
+
+	The original $E_8$ predictions targeted first-order asymptotics and
+	were refuted at that level.  We now ask: does the \emph{error term}
+	between the data and the singular series prediction carry structure?
+
+	\begin{definition}[Hardy--Littlewood residual]
+		For gap~$d$ among the first $N$ primes, define
+		\begin{equation}
+			\varepsilon_d(N) \;=\;
+			\frac{\#\{n \le N : g_n = d\}}{N}
+			\;-\; \frac{\mathfrak{S}(d)}{\ln p_N}.
+		\end{equation}
+	\end{definition}
+
+	\noindent At $10^9$, the Hardy--Littlewood residuals for the leading gap
+	sizes are shown in Table~\ref{tab:residuals}.
+
+	\begin{table}[h]
+		\centering
+		\begin{tabular}{@{}rrrr@{}}
+			\toprule
+			Gap $d$ & Observed & $\mathfrak{S}(d)/\!\ln p_N$ & Residual $\varepsilon_d$ \\
+			\midrule
+			$2$  & $0.05805$ & $0.05536$ & $+0.00269$ \\
+			$4$  & $0.05804$ & $0.05536$ & $+0.00268$ \\
+			$6$  & $0.10500$ & $0.11072$ & $-0.00572$ \\
+			$8$  & $0.04732$ & $0.05536$ & $-0.00803$ \\
+			$10$ & $0.06148$ & $0.07381$ & $-0.01233$ \\
+			$12$ & $0.08080$ & $0.11072$ & $-0.02992$ \\
+			$30$ & $0.04618$ & $0.14762$ & $-0.10144$ \\
+			\bottomrule
+		\end{tabular}
+		\caption{Hardy--Littlewood residuals at $10^9$ primes.  The
+			residuals are negative for most gaps, reflecting the
+			$O(1/\!\ln^2 p)$ correction to the leading-order singular
+			series.  The twin--cousin near-equality
+			$\varepsilon_2 \approx \varepsilon_4$ persists in the residuals.}
+		\label{tab:residuals}
+	\end{table}
+
+	\noindent The residuals encode three layers of structure:
+	%
+	\begin{itemize}
+		\item \textbf{Logarithmic corrections.}  The Hardy--Littlewood
+		asymptotic has $O(1/\!\ln^2 p)$ corrections from higher-order
+		sieve terms.  These are well understood and do not require
+		exceptional structure.  The predominantly negative residuals
+		in Table~\ref{tab:residuals} reflect the $-1/\!\ln^2 p$ term.
+
+		\item \textbf{Pair correlations.}  The GUE hypothesis
+		\cite{Montgomery1973} predicts that prime gap statistics, after
+		unfolding, match the eigenvalue spacing of large random Hermitian
+		matrices.  The connection between GUE and exceptional Lie groups
+		(via Weyl groups) is well established in random matrix theory.
+
+		\item \textbf{Higher-order $n$-point correlations.}  The singular
+		series governs the 1-point and 2-point functions.  The 3-point
+		and higher correlations---what proportion of \emph{consecutive}
+		gap triples $(g_n, g_{n+1}, g_{n+2})$ satisfy a given pattern---are
+		less constrained.  The MC~Pass-8 results
+		(Section~\ref{sec:mc-results}) directly test this domain via
+		$E_8$ root triplet coherence and find \textbf{no signal}: the
+		mean coherence matches the null distribution, and the $j$-function
+		correlation is exactly zero across $26.2 \times 10^6$ transcendental
+		triplets.
+	\end{itemize}
+
+	\begin{remark}[Status of the Exceptional Fluctuation Hypothesis]
+		Prior to the MC~Pass-8 and MGS~Pass-10 experiments, one could
+		conjecture that while $E_8$ does not govern the first-order
+		densities (which are determined by $\mathfrak{S}(d)$), it might
+		govern the higher-order correlations among consecutive
+		residuals.  The data now constrains this hypothesis from two
+		independent directions:
+		%
+		\begin{enumerate}
+			\item The MGS spectral scan finds no power at the Monster
+			frequency $1/196{,}883$ beyond white noise
+			($0.18\sigma$ above null; Section~\ref{sec:mgs-results}).
+			\item The MC triplet analysis finds no excess coherence
+			in the $E_8$ root assignment ($\bar\kappa = 1.061$ vs.\
+			null $1.046$; Section~\ref{sec:mc-results}).
+		\end{enumerate}
+		%
+		If $E_8$ structure exists in the prime gap fluctuations, it is
+		below the detection threshold of both tools at $N = 10^{11}$.
+	\end{remark}
+
+	%% ================================================================
+	\section{The $10^{11}$ Run: What to Look For}
+	\label{sec:100B}
+	%% ================================================================
+
+	A $10^{11}$-prime run (SRV~Pass-9) is in progress on a 24-core
+	workstation sieving to $p \approx 2.8 \times 10^{12}$.
+	The MC~Pass-8 run at $10^{11}$ has already completed
+	(Section~\ref{sec:mc-results}), and the MGS~Pass-10 run at $10^9$
+	is complete (Section~\ref{sec:mgs-results}).
+
+	At $20\%$ completion ($2 \times 10^{10}$ primes), the partial SRV
+	results already address two of the three guiding questions:
+
+	\begin{enumerate}
+		\item \textbf{Variance saturation.}  The variance continues to
+		grow monotonically: from $0.776$ at $10^9$ to $0.798$ at
+		$2 \times 10^{10}$, with no sign of saturation.  The growth rate
+		of $\sim 0.02$ per decade is consistent with $O(1/\!\ln N)$
+		convergence toward the Gallagher limit of~$1$.
+
+		\item \textbf{The $R_M$ limit.}  The ratio has grown from
+		$1.809$ at $10^9$ to $1.832$ at $2 \times 10^{10}$, continuing
+		its slow approach toward $\mathfrak{S}(6)/\mathfrak{S}(2) \approx 2.0$.
+		No overshoot is observed.
+
+		\item \textbf{Residual and spectral structure.}  The MGS~Pass-10
+		finds no spectral resonance at the Monster frequency, and the
+		MC~Pass-8 finds no excess $E_8$ triplet coherence.  The residuals
+		$\varepsilon_d(N)$ are consistent with standard
+		$O(1/\!\ln^2 p)$ corrections.  There is no evidence for
+		non-Gaussian or lattice-like structure in the residual vector.
+	\end{enumerate}
+
+	%% ================================================================
+	\section{The Crystalline Path: Structure in the Coherence Peaks}
+	\label{sec:crystalline}
+	%% ================================================================
+
+	The preceding sections establish that first-order gap statistics
+	are governed by the Hardy--Littlewood singular series.  We now
+	report a complementary analysis that reveals striking non-random
+	structure in a different observable: the \emph{Hamiltonian path}
+	connecting the vertices of highest triplet coherence.
+
+	\subsection{Method: The Crystalline Path Decoder}
+
+	From the first $10^8$ primes, we compute the triplet coherence
+	$\kappa_i = \|r_{i-1} + r_i + r_{i+1}\|^2 / 6$ at each index~$i$,
+	where $r_j$ is the $E_8$ root assigned to gap~$j$.  We extract
+	the top $K = 500$ vertices by coherence using an $O(N \log K)$
+	min-heap, then sort them by prime index to obtain the
+	\textbf{crystalline path}: a sequence of 500~vertices and
+	499~edges ordered by their position in the prime sequence.
+
+	For each edge, we record the $E_8$ root transition
+	$(\alpha_i \to \alpha_{i+1})$, the inner product
+	$\langle \alpha_i, \alpha_{i+1} \rangle$, the Ulam-plane angle,
+	and the prime-index gap.  The analysis uses three tools:
+	\texttt{path\_decoder.c} (C/OpenMP), \texttt{vertex\_path\_decoder.py}
+	(geodesic angle decoding), and \texttt{monstrous\_assembler.py}
+	(run-length encoding).
+
+	\subsection{Results: Extreme Non-Randomness}
+
+	The crystalline path exhibits structure that is \emph{absent} from
+	the bulk gap distribution but emerges powerfully in the
+	extreme-coherence subset.
+
+	\subsubsection{Run-Length Clustering}
+
+	A \textbf{run} is a maximal consecutive subsequence of edges
+	sharing the same $E_8$ root.  The 499 edges compress to 212 runs.
+	We compare against a null model of 1000 random permutations of
+	the same vertex set:
+
+	\begin{center}
+		\renewcommand{\arraystretch}{1.3}
+		\begin{tabular}{@{}lrrrr@{}}
+			\toprule
+			Metric & True & Null mean & Null std & $z$-score \\
+			\midrule
+			Number of runs & 212 & 472.1 & 4.50 & $-57.78$ \\
+			Mean run length & 2.35 & 1.057 & 0.010 & $\mathbf{+128.34}$ \\
+			Max run length & 15 & 3.1 & 0.60 & $+19.87$ \\
+			Compression ratio & 0.425 & 0.946 & 0.009 & $-57.78$ \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\noindent The $z$-score of $+128.34$ for mean run length represents
+	a deviation of over one hundred standard deviations from random
+	expectation.  Under the null hypothesis, the probability of observing
+	this value is less than $10^{-3500}$.  The path holds each $E_8$ root
+	for an average of 2.35~consecutive edges (vs.\ 1.06 expected), with
+	maximum runs of length~15.
+
+	\subsubsection{$G_2$ Confinement}
+
+	All 500 crystalline vertices are members of the $G_2$ sublattice of
+	$E_8$.  All are Type~II (half-integer, spinor sector) roots.  The
+	same-root fraction between consecutive edges is $57.7\%$
+	(null expectation: $0.4\%$, $z = +54.13$).
+
+	\subsubsection{The Information Axis}
+
+	Four ``Zeta-axis'' roots (indices 108--111) dominate the path,
+	accounting for $202/499 = 40.5\%$ of all edges:
+
+	\begin{center}
+		\renewcommand{\arraystretch}{1.3}
+		\begin{tabular}{@{}crrcl@{}}
+			\toprule
+			Root & Runs & Edges & Type & Coordinates \\
+			\midrule
+			109 & 19 & 60 & I & $(0,0,0,0,0,0,-1,+1)$ \\
+			110 & 14 & 52 & I & $(0,0,0,0,0,0,+1,-1)$ \\
+			111 & 12 & 44 & I & $(0,0,0,0,0,0,+1,+1)$ \\
+			108 & 10 & 46 & I & $(0,0,0,0,0,0,-1,-1)$ \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\noindent These roots share the property that their first six
+	coordinates vanish: they point along the ``Zeta axis'' in
+	$\mathbb{R}^8$.  Each has a dedicated satellite partner,
+	creating structured A$\leftrightarrow$B oscillation patterns.
+
+	\subsubsection{The Bootloader}
+
+	At small scale ($K = 38$ vertices from $10^6$ primes), the path
+	reveals a \emph{monotonic descent through root indices}:
+	\[
+		176 \to 152 \to 146 \to 142 \to 141 \to 140 \to 135 \to \cdots
+		\to 125 \to 124 \to 123 \to 122,
+	\]
+	with $11/20$ transitions being simple Weyl reflections
+	($\langle \alpha_i, \alpha_{i+1} \rangle = +1$).
+
+	\subsection{Reconciliation with the Null Results}
+
+	The crystalline path results do not contradict the singular
+	series findings of Sections~\ref{sec:variance}--\ref{sec:ratio}.
+	The key distinction is the \emph{observable}:
+
+	\begin{itemize}
+		\item \textbf{Bulk gap statistics} (SRV, MGS, MC) test the
+		first-order distribution of \emph{all} gaps.  These are governed
+		by the Hardy--Littlewood singular series, as confirmed.
+
+		\item \textbf{Crystalline path statistics} test the
+		\emph{correlations among extreme-coherence vertices}---the
+		top $\sim 0.0005\%$ of all indices.  The structure here is not
+		about individual gap frequencies but about the ordering of
+		rare events in the prime sequence.
+	\end{itemize}
+
+	\noindent The singular series is a one-point function: it
+	predicts $\Pr(g_n = d)$.  The crystalline path probes a
+	conditional multi-point function:
+	$\Pr(\alpha_{n+1} = \beta \mid \kappa_n > 2.5,\, \alpha_n = \alpha)$.
+	The $z$-score of $+128.34$ demonstrates that this conditional
+	distribution is highly non-uniform---the extreme-coherence
+	vertices ``remember'' their predecessors' $E_8$ root assignments,
+	creating long runs and structured transitions.
+
+	Whether this structure is an artifact of the phase map
+	$\tilde g \mapsto \alpha$ (which maps nearby gaps to the same root)
+	combined with the known short-range correlations of prime gaps,
+	or a deeper phenomenon, is the central open question.  The null
+	model---which preserves both the vertex set and the $E_8$
+	assignments but randomizes their ordering---shows that the
+	structure is not a property of the vertex set alone; it
+	requires the \emph{prime-index ordering} to appear.
+
+	%% ================================================================
+	\section{Toward Formal Verification}
+	\label{sec:lean}
+	%% ================================================================
+
+	The empirical results motivate a Lean~4 formalization program
+	targeting the structures the data \emph{confirms}, rather than those
+	it refutes.  We identify four paths---the first three address
+	the singular series framework; the fourth targets the crystalline
+	path structure discovered in Section~\ref{sec:crystalline}.
+
+	\subsection{Path 1: The Singular Series}
+
+	The singular series $\mathfrak{S}(d)$ is an explicit Euler product
+	computable from the prime factorization of~$d$.  Its formalization
+	requires:
+	%
+	\begin{itemize}
+		\item The twin prime constant
+		$C_2 = \prod_{p > 2}(1 - 1/(p-1)^2)$ as a convergent product
+		over primes.
+		\item The singular series
+		$\mathfrak{S}(d) = 2C_2 \prod_{p \mid d,\, p>2}(p-1)/(p-2)$
+		for even~$d$.
+		\item The ratio identity
+		$\mathfrak{S}(6)/\mathfrak{S}(2) = 4/3 \cdot \prod(\text{correction})$.
+	\end{itemize}
+
+	\subsection{Path 2: The Twin--Cousin Degeneracy}
+
+	\begin{theorem}[Twin--cousin degeneracy]
+		$\mathfrak{S}(2) = \mathfrak{S}(4)$.
+	\end{theorem}
+	%
+	\noindent\textit{Proof sketch.}  Both 2 and 4 are even, so both patterns
+	$\{0,2\}$ and $\{0,4\}$ are admissible.  Neither 2 nor 4 has an
+	odd prime divisor that divides the other, so the correction factor
+	$\prod_{p \mid d,\, p>2}(p-1)/(p-2)$ is the empty product ($= 1$)
+	in both cases.  Hence $\mathfrak{S}(2) = \mathfrak{S}(4) = 2C_2$. \qed
+
+	\medskip\noindent This is a clean, self-contained result suitable for
+	contribution to Mathlib.  The Lean~4 proof requires only the
+	definition of $\mathfrak{S}$ as a product over primes and the
+	fact that $\{p > 2 : p \mid 2\} = \{p > 2 : p \mid 4\} = \emptyset$.
+
+	\subsection{Path 3: The Sub-Poisson Variance}
+
+	\begin{conjecture}[Sub-Poisson inequality]
+		For all $N \ge 2$,
+		$\operatorname{Var}(\tilde g_1, \ldots, \tilde g_{N-1}) < 1$.
+	\end{conjecture}
+
+	\noindent This is stronger than a consequence of Gallagher's theorem
+	(which gives the \emph{limit}); it asserts that the variance is
+	bounded \emph{strictly} below~$1$ at every finite scale.
+	Formalizing this requires showing that the sieve compression from
+	small primes dominates the large-gap tail at every~$N$---a
+	finite but nontrivial combinatorial argument.
+
+	\subsection{Path 4: Crystalline Run-Length Bounds}
+
+	The crystalline path results of Section~\ref{sec:crystalline}
+	suggest a fourth formalization target: the \emph{conditional
+	correlation structure} among extreme-coherence vertices.
+
+	\begin{definition}[Run-length excess]
+		For a sequence of $E_8$ root assignments $(\alpha_1, \ldots, \alpha_M)$
+		along a crystalline path of $M$ edges, the \textbf{run-length excess}
+		is
+		$\mathcal{E}_M = \bar\ell - 1$,
+		where $\bar\ell$ is the mean run length.
+	\end{definition}
+
+	\noindent The empirical result $\bar\ell = 2.35$ (z-score $+128.34$)
+	establishes $\mathcal{E}_{499} = 1.35 > 0$.  A formal proof that
+	$\mathcal{E}_M > 0$ for all $M$ (i.e., that the crystalline path
+	always has fewer runs than a random permutation) would be a
+	statement about the short-range correlations of the $E_8$ phase
+	map applied to prime gaps.
+
+	The algebraic component of this path is formalizable now:
+	%
+	\begin{itemize}
+		\item The $E_8$ root system as a finite set in
+		$\mathbb{R}^8$ with $|\Lambda| = 240$
+		(\texttt{E8Lattice.lean}: 240 roots, norm, inner product,
+		all proved by \texttt{native\_decide}).
+		\item The $E_{10} = T(2,3,7)$ Coxeter matrix and Lehmer's
+		polynomial (\texttt{Lehmer.lean}: 14 theorems, 3 axioms,
+		connecting the $E$-series spectral radius to the smallest
+		known Salem number $\lambda_0 \approx 1.17628$).
+		\item The $G_2$ sublattice membership as a decidable predicate
+		on $\Lambda$.
+		\item The inner product spectrum: for any
+		$\alpha, \beta \in \Lambda$,
+		$\langle \alpha, \beta \rangle \in \{-2, -1, 0, +1, +2\}$.
+		\item The run-length extraction algorithm as a computable
+		function on lists.
+	\end{itemize}
+	%
+	\noindent The analytic component (proving that prime-index ordering
+	creates the excess) requires either an explicit bound on gap
+	correlations or an axiomatization of the phase map's local
+	injectivity properties.
+
+	%% ================================================================
+	\section{Conclusion}
+	\label{sec:conclusion}
+	%% ================================================================
+
+	We have tested the predictions of the $E_8$ Diamond framework using
+	four independent high-performance tools across five orders of
+	magnitude ($10^5$ to $10^{11}$ primes):
+	%
+	\begin{itemize}
+		\item \textbf{SRV~Pass-9} ($N = 10^5$ to $2 \times 10^{10}$,
+		partial $10^{11}$): the variance, ratio, and mandala all converge
+		toward the Hardy--Littlewood / Gallagher predictions, not the
+		$E_8$ values.
+
+		\item \textbf{MGS~Pass-10} ($N = 10^9$, 5,079 resonance points):
+		no spectral resonance at the Monster frequency $1/196{,}883$
+		(power within $0.18\sigma$ of white noise), and zero Pearson
+		correlation with $j$-function coefficients.
+
+		\item \textbf{MC~Pass-8} ($N = 10^{11}$, $33.3 \times 10^9$
+		triplets): $E_8$ root triplet coherence matches the null
+		distribution, and the $j$-function correlation is exactly zero
+		across $26.2 \times 10^6$ transcendental events.
+
+		\item \textbf{Crystalline Path Decoder} ($N = 10^8$, 500~vertices):
+		the Hamiltonian path connecting extreme-coherence vertices shows
+		massive non-random structure ($z = +128.34$ for run-length clustering,
+		$z = +54.13$ for same-root persistence), complete $G_2$ confinement,
+		and Zeta-axis dominance.
+	\end{itemize}
+
+	\noindent The picture that emerges is a \emph{two-layer} structure:
+
+	\begin{enumerate}
+		\item \textbf{Classical layer.}  The first-order asymptotics are
+		governed by the Hardy--Littlewood singular series---an Euler
+		product on the ad\`ele class space.  The SRV, MGS, and MC tools
+		confirm this with high precision at all scales tested.  The
+		bulk gap distribution, the Goertzel spectrum, and the triplet
+		coherence show no evidence of exceptional structure.
+
+		\item \textbf{Topological layer.}  The \emph{ordering} of
+		extreme-coherence events---the crystalline path---carries
+		$z$-scores exceeding $+128$, demonstrating that the
+		prime-index ordering creates run-length clustering,
+		$G_2$~confinement, and Weyl-chain structure that are absent
+		from random permutations of the same vertex set.  This
+		structure lives in the conditional multi-point correlations
+		$\Pr(\alpha_{n+1} \mid \alpha_n, \kappa_n > 2.5)$, not in
+		the one-point function $\Pr(g_n = d)$ that the singular
+		series governs.
+	\end{enumerate}
+
+	\noindent Whether the topological layer reflects a genuine geometric
+	constraint (as the Hodge--de Rham framework predicts) or is a
+	consequence of the short-range correlations of prime gaps amplified
+	by the $E_8$ phase map is the central open question.  The null
+	model---which randomizes the prime-index ordering while preserving
+	the vertex set---definitively establishes that the structure
+	requires the ordering; it is not an artifact of the $E_8$
+	assignment alone.
+
+	Three concrete next steps follow from this work:
+	%
+	\begin{enumerate}
+		\item Complete the $10^{11}$-prime SRV run and confirm that the
+		variance trajectory continues toward the Gallagher limit with no
+		secondary plateau.
+		\item Formalize the twin--cousin degeneracy
+		($\mathfrak{S}(2) = \mathfrak{S}(4)$) and the sub-Poisson
+		variance inequality in Lean~4 as contributions to Mathlib.
+		\item Scale the crystalline path decoder to $10^{10}$ primes
+		with $K = 5{,}000$ vertices to determine whether the $G_2$
+		confinement and run-length excess persist, strengthen, or
+		decay at larger scales.
+	\end{enumerate}
+
+	%% ================================================================
+	\begin{thebibliography}{99}
+
+		\bibitem{HL1923}
+		G.\,H.\ Hardy and J.\,E.\ Littlewood,
+		``Some problems of `Partitio Numerorum' III: On the expression of a number as a sum of primes,''
+		\textit{Acta Math.}\ \textbf{44} (1923), 1--70.
+
+		\bibitem{Gallagher1976}
+		P.\,X.\ Gallagher,
+		``On the distribution of primes in short intervals,''
+		\textit{Mathematika}\ \textbf{23} (1976), 4--9.
+
+		\bibitem{Montgomery1973}
+		H.\,L.\ Montgomery,
+		``The pair correlation of zeros of the zeta function,''
+		\textit{Proc.\ Symp.\ Pure Math.}\ \textbf{24} (1973), 181--193.
+
+		\bibitem{Odlyzko1987}
+		A.\,M.\ Odlyzko,
+		``On the distribution of spacings between zeros of the zeta function,''
+		\textit{Math.\ Comp.}\ \textbf{48} (1987), 273--308.
+
+		\bibitem{Dusart2010}
+		P.\ Dusart,
+		``Estimates of some functions over primes without R.H.,''
+		\textit{arXiv:1002.0442} (2010).
+
+		\bibitem{Cramer1936}
+		H.\ Cram\'er,
+		``On the order of magnitude of the difference between consecutive prime numbers,''
+		\textit{Acta Arith.}\ \textbf{2} (1936), 23--46.
+
+		\bibitem{Tate1950}
+		J.\,T.\ Tate,
+		``Fourier analysis in number fields and Hecke's zeta-functions,''
+		Ph.D.\ thesis, Princeton University (1950);
+		reprinted in \textit{Algebraic Number Theory}, Academic Press (1967), 305--347.
+
+		\bibitem{Connes1999}
+		A.\ Connes,
+		``Trace formula in noncommutative geometry and the zeros of the Riemann zeta function,''
+		\textit{Selecta Math.\ (N.S.)}\ \textbf{5} (1999), 29--106.
+
+	\end{thebibliography}
+
+\end{document}

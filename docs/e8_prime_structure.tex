@@ -1,0 +1,1502 @@
+\documentclass[12pt,a4paper]{article}
+
+% ================================================================
+% Packages
+% ================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{microtype}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{longtable}
+
+% ================================================================
+% Theorem environments
+% ================================================================
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{remark}[theorem]{Remark}
+
+% ================================================================
+% Macros
+% ================================================================
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\F}{\mathbb{F}}
+\newcommand{\OO}{\mathbb{O}}
+\newcommand{\norm}[1]{\lVert #1 \rVert}
+\newcommand{\abs}[1]{\lvert #1 \rvert}
+\newcommand{\ip}[2]{\langle #1, #2 \rangle}
+\DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator{\sgn}{sgn}
+\DeclareMathOperator{\Aut}{Aut}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{green!50!black},
+  stringstyle=\color{red!60!black},
+}
+
+% ================================================================
+\title{%
+  Prime Gap Structure via Exceptional Lattice Projections:\\
+  E8, F4, and the Crystalline Grid of $2 \times 10^6$ Primes
+}
+\author{John Janik}
+\date{February 21, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We construct a deterministic map from the sequence of prime gaps to the
+$E_8$ root system, and study its restriction to the $F_4$ sublattice.
+Given consecutive primes $p_n < p_{n+1}$, the normalized gap
+$\tilde{g}_n = (p_{n+1} - p_n)/\log p_n$ is mapped to one of the 240
+roots of $E_8$ via a phase function derived from the lattice's minimal
+norm $\sqrt{2}$.  We project $E_8$ roots onto the $F_4$ sublattice (48
+roots) using cosine similarity and show that \emph{all 240} $E_8$ roots
+pass the $F_4$ quality threshold---a structural fact we prove by
+case analysis on root types.  The Jordan trace from the Albert algebra
+$J_3(\OO)$ provides a coloring of the Ulam spiral, and an F4 Exceptional
+Fourier Transform (F4-EFT) with Salem--Jordan filtering extracts
+\emph{crystalline vertices}: discrete points of maximal $F_4$ resonance.
+
+In addition, we implement twelve independent decoding methods that
+attempt to extract structured information from the prime gap sequence
+via $E_8/2E_8$ Hamming extraction, sign bits, parity bits, $F_4$ root
+indices, Jordan trace classification, and crystalline vertex properties.
+All methods are evaluated on $2 \times 10^6$ primes with entropy,
+chi-square, and longest-printable-run metrics.
+
+All algorithms are given in full detail with explicit formulas.  The
+analysis is implemented in Python, C/OpenMP (self-contained PPM
+renderer), and a comprehensive multi-method decoder; source code is
+publicly available.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% ================================================================
+\section{Introduction}
+\label{sec:intro}
+% ================================================================
+
+The distribution of prime numbers is one of the oldest problems in
+mathematics.  While the Prime Number Theorem establishes that
+$\pi(x) \sim x/\log x$ as $x \to \infty$, the fine-scale behavior of
+individual prime gaps $g_n = p_{n+1} - p_n$ remains largely mysterious.
+The Cram\'er model \cite{cramer1936} predicts that $g_n$ fluctuates
+around $\log p_n$, but the actual distribution displays structure that
+goes beyond simple randomness: twin primes cluster, Polignac gaps
+recur, and the Ulam spiral \cite{ulam1963} reveals diagonal alignments
+corresponding to prime-producing quadratic polynomials.
+
+In this paper, we introduce a framework for analyzing prime gap
+structure using the exceptional Lie lattices $E_8$ and $F_4$.  Our
+approach is organized in four layers:
+
+\begin{enumerate}[label=(\roman*)]
+\item \textbf{E8 Root Assignment} (\cref{sec:e8}): Each normalized
+  prime gap $\tilde{g}_n$ is deterministically assigned to one of the
+  240 roots of $E_8$.  The \emph{projection slope} of the assigned
+  root induces a coloring of the Ulam spiral that displays
+  concentric ring structure.
+
+\item \textbf{F4 Sublattice Filtering} (\cref{sec:f4}): The E8 roots
+  are projected onto the 48-root $F_4$ sublattice via cosine
+  similarity, and the \emph{Jordan trace} from the Albert algebra
+  $J_3(\OO)$ provides a secondary coloring.  We prove that all 240
+  $E_8$ roots achieve $F_4$ projection quality $\ge 0.7$, yielding
+  100\% $F_4$ coverage.
+
+\item \textbf{Spectral Analysis} (\cref{sec:spectral}): An
+  \emph{F4 Exceptional Fourier Transform} (F4-EFT) decomposes the
+  gap signal into 48 spectral components, and a
+  \emph{Salem--Jordan kernel} filters the spectrum to extract
+  crystalline vertices with idempotent boosting.
+
+\item \textbf{Multi-Method Decoding} (\cref{sec:decoder}): Twelve
+  independent extraction methods attempt to recover structured
+  information from the prime gap data, evaluated with statistical
+  tests for non-randomness.
+\end{enumerate}
+
+We emphasize that the patterns we observe are consequences of the
+specific mathematical construction applied to prime gap statistics;
+they do not constitute a proof of any conjecture about prime
+distribution.  The purpose of this paper is to describe the
+construction in full reproducible detail, report the computational
+results, and discuss what the observed patterns do and do not imply.
+
+\subsection{Notation}
+
+Throughout, $p_n$ denotes the $n$-th prime ($p_1 = 2, p_2 = 3,
+\ldots$).  We write $g_n = p_{n+1} - p_n$ for the $n$-th prime gap
+and $\tilde{g}_n = g_n / \log p_n$ for the normalized gap.  By the
+Prime Number Theorem, $\tilde{g}_n$ has mean asymptotically equal to 1.
+We use $\norm{\cdot}$ for the Euclidean norm in $\R^d$.
+
+% ================================================================
+\section{The E8 Root System and Prime Gap Assignment}
+\label{sec:e8}
+% ================================================================
+
+\subsection{The E8 Root System}
+\label{sec:e8roots}
+
+The $E_8$ root system is the unique rank-8 even unimodular lattice.
+It has 240 roots (vectors of minimal norm $\sqrt{2}$), which fall into
+two classes \cite{conway1999,humphreys1972}:
+
+\begin{definition}[E8 roots]
+\label{def:e8roots}
+The 240 roots of $E_8$ in $\R^8$ consist of:
+\begin{enumerate}[label=(\alph*)]
+\item \textbf{Type I} (112 roots): $\pm e_i \pm e_j$ for
+  $1 \le i < j \le 8$, where $e_i$ is the $i$-th standard basis
+  vector.
+
+\item \textbf{Type II} (128 roots):
+  $\tfrac{1}{2}(\pm 1, \pm 1, \pm 1, \pm 1, \pm 1, \pm 1, \pm 1,
+  \pm 1)$ where the number of negative signs is even.
+\end{enumerate}
+\end{definition}
+
+\begin{proposition}
+All 240 roots have Euclidean norm $\sqrt{2}$.
+\end{proposition}
+
+\begin{proof}
+For Type~I: $\norm{\pm e_i \pm e_j}^2 = 1 + 1 = 2$.
+For Type~II: $\norm{(\pm\tfrac{1}{2})^8}^2 = 8 \cdot \tfrac{1}{4} = 2$.
+\end{proof}
+
+\begin{remark}[Enumeration algorithm]
+For Type~I, iterate over all $\binom{8}{2} = 28$ pairs $(i,j)$ and all
+$4$ sign combinations $(s_1, s_2) \in \{-1,+1\}^2$, yielding
+$28 \times 4 = 112$ roots.  For Type~II, iterate over all
+$2^8 = 256$ sign masks; for bit $k$ of the mask, set coordinate $k$ to
+$+\tfrac{1}{2}$ if the bit is 1, $-\tfrac{1}{2}$ otherwise.  Keep only
+masks where the number of 0-bits (negative signs) is even; by parity,
+exactly 128 survive.  Total: $112 + 128 = 240$.
+\end{remark}
+
+\subsection{Projection Slope}
+\label{sec:slope}
+
+We partition the eight coordinates of $\R^8$ into two groups of four:
+the ``base'' coordinates $(r_1, r_2, r_3, r_4)$ and the ``fiber''
+coordinates $(r_5, r_6, r_7, r_8)$.
+
+\begin{definition}[Projection slope]
+\label{def:slope}
+For an $E_8$ root $\alpha = (r_1, \ldots, r_8) \in \R^8$, define:
+\begin{align}
+x(\alpha) &= r_1 + r_2 + r_3 + r_4, \\
+y(\alpha) &= r_5 + r_6 + r_7 + r_8.
+\end{align}
+The \emph{projection slope} is:
+\begin{equation}
+\label{eq:slope}
+s(\alpha) =
+\begin{cases}
+y(\alpha) / x(\alpha) & \text{if } \abs{x(\alpha)} > 0.01, \\
+\sgn(y(\alpha)) \cdot 10 & \text{otherwise}.
+\end{cases}
+\end{equation}
+\end{definition}
+
+\subsection{The Root Assignment Map}
+\label{sec:assignment}
+
+Given a normalized prime gap $\tilde{g}_n \ge 0$, we assign an
+$E_8$ root index as follows.
+
+\begin{definition}[E8 root assignment]
+\label{def:assignment}
+Fix an enumeration $\alpha_0, \alpha_1, \ldots, \alpha_{239}$ of the
+240 $E_8$ roots (in the order specified by
+\cref{def:e8roots}).  Define:
+\begin{align}
+\label{eq:target_norm}
+t(\tilde{g}) &= \sqrt{\max(\tilde{g},\, 0.01)}, \\
+\label{eq:phase}
+\varphi(\tilde{g}) &= \frac{t(\tilde{g})}{\sqrt{2}} \bmod 1, \\
+\label{eq:root_index}
+\iota(\tilde{g}) &= \lfloor 240 \cdot \varphi(\tilde{g}) \rfloor \bmod 240.
+\end{align}
+The assigned root is $\alpha_{\iota(\tilde{g})}$.
+\end{definition}
+
+\begin{proposition}
+\label{prop:periodicity}
+The root assignment is periodic: $\iota(\tilde{g}) = \iota(\tilde{g}')$
+whenever $\sqrt{\tilde{g}} - \sqrt{\tilde{g}'} = k\sqrt{2}$ for some
+integer $k$.
+\end{proposition}
+
+\begin{proof}
+If $\sqrt{\tilde{g}} = \sqrt{\tilde{g}'} + k\sqrt{2}$, then
+$\varphi(\tilde{g}) = (\sqrt{\tilde{g}}/\sqrt{2}) \bmod 1 =
+(\sqrt{\tilde{g}'}/\sqrt{2} + k) \bmod 1 = \varphi(\tilde{g}')$.
+\end{proof}
+
+\subsection{Ulam Spiral Coordinates}
+\label{sec:ulam}
+
+The Ulam spiral \cite{ulam1963} arranges natural numbers on $\Z^2$ by
+spiraling outward from the origin.
+
+\begin{definition}[Ulam coordinates]
+\label{def:ulam}
+For $p \ge 1$, let $k = \lceil (\sqrt{p} - 1)/2 \rceil$, let
+$t = 2k + 1$, and let $m = t^2$.  Set $t \leftarrow t - 1 = 2k$.
+Then:
+\begin{equation}
+(u_x(p),\, u_y(p)) =
+\begin{cases}
+(k - (m - p),\; -k) & \text{if } p \ge m - t, \\
+(-k,\; -k + (m - t - p)) & \text{if } p \ge m - 2t, \\
+(-k + (m - 2t - p),\; k) & \text{if } p \ge m - 3t, \\
+(k,\; k - (m - 3t - p)) & \text{otherwise}.
+\end{cases}
+\end{equation}
+Each prime is mapped in $O(1)$ time, making the computation
+embarrassingly parallel.
+\end{definition}
+
+% ================================================================
+\section{The F4 Root System and Jordan Trace}
+\label{sec:f4}
+% ================================================================
+
+\subsection{The F4 Root System}
+\label{sec:f4roots}
+
+The $F_4$ root system has rank 4 and 48 roots.  It is the
+automorphism group of the exceptional Jordan algebra
+$J_3(\OO)$ \cite{freudenthal1954,springer1998}.  The Dynkin diagram
+is:
+\begin{equation}
+\underset{\alpha_1}{\circ}
+\text{---}
+\underset{\alpha_2}{\circ}
+\Longrightarrow
+\underset{\alpha_3}{\circ}
+\text{---}
+\underset{\alpha_4}{\circ}
+\end{equation}
+The Cartan matrix is:
+\begin{equation}
+A_{F_4} =
+\begin{pmatrix}
+ 2 & -1 &  0 &  0 \\
+-1 &  2 & -2 &  0 \\
+ 0 & -1 &  2 & -1 \\
+ 0 &  0 & -1 &  2
+\end{pmatrix}.
+\end{equation}
+
+\begin{definition}[F4 roots in $\R^4$]
+\label{def:f4roots}
+The 48 roots of $F_4$ consist of:
+\begin{enumerate}[label=(\alph*)]
+\item \textbf{24 long roots} (norm $\sqrt{2}$):
+  $\pm e_i \pm e_j$ for $1 \le i < j \le 4$.
+  ($\binom{4}{2} \times 4 = 24$ roots.)
+
+\item \textbf{8 short roots of type A} (norm $1$):
+  $\pm e_i$ for $1 \le i \le 4$.
+
+\item \textbf{8 short roots of type B} (norm $1$):
+  $\tfrac{1}{2}(\pm 1, \pm 1, \pm 1, \pm 1)$ with an even number
+  of negative signs.
+
+\item \textbf{8 short roots of type C} (norm $1$):
+  $\tfrac{1}{2}(\pm 1, \pm 1, \pm 1, \pm 1)$ with an odd number
+  of negative signs.
+\end{enumerate}
+Total: $24 + 8 + 8 + 8 = 48$.
+\end{definition}
+
+\subsection{E8 to F4 Projection}
+\label{sec:e8f4}
+
+We project $E_8$ roots onto the $F_4$ sublattice via the first four
+coordinates.
+
+\begin{definition}[E8 to F4 mapping]
+\label{def:e8f4map}
+For an $E_8$ root $\alpha = (r_1, \ldots, r_8)$:
+\begin{enumerate}
+\item Compute the projection $\pi(\alpha) = (r_1, r_2, r_3, r_4)$.
+\item If $\norm{\pi(\alpha)} < 0.01$, use the fallback
+  $\pi(\alpha) = (r_5, r_6, r_7, r_8)$.
+\item Normalize: $\hat{\pi} = \pi(\alpha) / \norm{\pi(\alpha)}$.
+\item For each $F_4$ root $\beta_j$ ($j = 0, \ldots, 47$), compute
+  the cosine similarity:
+  \begin{equation}
+  \cos\theta_j = \frac{\abs{\ip{\hat{\pi}}{\hat{\beta}_j}}}
+                      {\norm{\hat{\pi}} \cdot \norm{\hat{\beta}_j}}.
+  \end{equation}
+\item Assign $\alpha$ to the $F_4$ root $\beta_{j^*}$ with the
+  largest $\cos\theta_{j^*}$.
+\end{enumerate}
+\end{definition}
+
+\begin{definition}[F4 quality threshold]
+\label{def:quality}
+An $E_8$ root $\alpha$ passes the \emph{F4 quality threshold} if
+$q(\alpha) \ge 0.7$, where $q(\alpha)$ is the cosine similarity
+between the (possibly fallback) projection and the assigned $F_4$ root.
+\end{definition}
+
+\begin{theorem}[Complete F4 coverage]
+\label{thm:f4complete}
+All 240 $E_8$ roots satisfy $q(\alpha) = 1.0$ under the mapping of
+\cref{def:e8f4map}.  Consequently, the F4 mapping fraction is
+exactly $100\%$.
+\end{theorem}
+
+\begin{proof}
+We analyze each root type:
+
+\medskip\noindent
+\textbf{Case 1: Type~I roots $\pm e_i \pm e_j$ with $i < j \le 4$.}
+Both coordinates $i, j$ lie in the first four, so
+$\pi(\alpha) = \pm e_i \pm e_j$, which is itself a long $F_4$ root.
+The cosine similarity with itself is $1.0$.
+
+\medskip\noindent
+\textbf{Case 2: Type~I roots $\pm e_i \pm e_j$ with $i \le 4 < j$.}
+Exactly one coordinate is in the first four:
+$\pi(\alpha) = \pm e_i$, which is a short $F_4$ root (type~A).
+Similarity: $1.0$.
+
+\medskip\noindent
+\textbf{Case 3: Type~I roots $\pm e_i \pm e_j$ with $4 < i < j$.}
+Both coordinates are in the last four:
+$\norm{\pi(\alpha)} = 0$, so the fallback is used.  The fallback
+projection $\pi(\alpha) = (r_5, r_6, r_7, r_8) = \pm e_{i-4} \pm e_{j-4}$
+maps to coordinates 1--4, which is a long $F_4$ root.  Similarity: $1.0$.
+
+\medskip\noindent
+\textbf{Case 4: Type~II roots $(\pm\tfrac{1}{2})^8$ (even negatives).}
+The first four coordinates form a vector
+$\tfrac{1}{2}(\pm 1, \pm 1, \pm 1, \pm 1)$.  This is an $F_4$ short root
+(type~B if even negatives among the first four, type~C if odd negatives
+among the first four---both cases match an $F_4$ root exactly).
+Similarity: $1.0$.
+
+\medskip
+In every case, the projection (or its fallback) is \emph{exactly} an
+$F_4$ root, so $q(\alpha) = 1.0 \ge 0.7$.
+\end{proof}
+
+\begin{remark}
+This contrasts with a na\"ive expectation that $E_8$ would ``lose''
+roots when projected to $F_4$.  The completeness follows from the fact
+that both the Type~I and Type~II $E_8$ roots, when projected to their
+first (or last) four coordinates, always land exactly on an $F_4$ root
+vector.  This is a consequence of the branching rule
+$E_8 \supset F_4 \times G_2$ and the choice of coordinate-aligned
+projection.
+\end{remark}
+
+\subsection{The Albert Algebra and Jordan Trace}
+\label{sec:jordan}
+
+The exceptional Jordan algebra $J_3(\OO)$ consists of $3 \times 3$
+Hermitian matrices over the octonions
+$\OO$ \cite{jordan1934,mccrimmon2004,baez2002}:
+\begin{equation}
+X =
+\begin{pmatrix}
+\xi_1 & x_3 & \bar{x}_2 \\
+\bar{x}_3 & \xi_2 & x_1 \\
+x_2 & \bar{x}_1 & \xi_3
+\end{pmatrix},
+\quad \xi_i \in \R,\; x_i \in \OO.
+\end{equation}
+The automorphism group is $\Aut(J_3(\OO)) = F_4$.  The
+\emph{trace} is $\tr(X) = \xi_1 + \xi_2 + \xi_3$.
+
+\begin{definition}[Jordan trace of an F4 root]
+\label{def:jtrace}
+For an $F_4$ root $\beta = (b_1, b_2, b_3, b_4) \in \R^4$, define
+the \emph{projection matrix}:
+\begin{equation}
+P =
+\begin{pmatrix}
+1 & 0 & 0 & 0 \\
+0 & 1 & 0 & 0 \\
+0 & 0 & 1 & 1
+\end{pmatrix},
+\end{equation}
+which maps $\beta$ to the Albert algebra diagonal
+$(\xi_1, \xi_2, \xi_3) = P\beta = (b_1,\; b_2,\; b_3 + b_4)$.
+The \emph{Jordan trace} is:
+\begin{equation}
+\label{eq:jtrace}
+J(\beta) = \tr(P\beta) = \xi_1 + \xi_2 + \xi_3 = b_1 + b_2 + b_3 + b_4.
+\end{equation}
+\end{definition}
+
+\begin{remark}
+The projection matrix $P$ embeds the $F_4$ Cartan subalgebra into
+the diagonal of $J_3(\OO)$.  The combining of $b_3$ and $b_4$ into
+$\xi_3 = b_3 + b_4$ corresponds to the identification of the $F_4$
+Cartan subalgebra with the traceless diagonal of $J_3(\OO)$ modulo the
+center.  While $J(\beta)$ simplifies to $\sum_i b_i$, the
+3-component decomposition $(b_1, b_2, b_3 + b_4)$ retains the
+Albert algebra structure and is used for idempotent classification.
+\end{remark}
+
+\begin{proposition}[Jordan trace values]
+\label{prop:jtrace_values}
+The Jordan traces for the 48 $F_4$ roots and their multiplicities are:
+\begin{center}
+\begin{tabular}{c|cccccccccc}
+\toprule
+$J(\beta)$ & $-2$ & $-1$ & $0$ & $+1$ & $+2$ \\
+\midrule
+Long roots & 4 & 0 & 8 & 0 & 4 \\
+Short type A & 0 & 4 & 0 & 4 & 0 \\
+Short type B & 1 & 0 & 6 & 0 & 1 \\
+Short type C & 0 & 4 & 0 & 4 & 0 \\
+\midrule
+\textbf{Total} & \textbf{5} & \textbf{8} & \textbf{14} & \textbf{8} & \textbf{5} \\
+\bottomrule
+\end{tabular}
+\end{center}
+The idempotent-type roots ($\abs{J} = 1$) number 16, and the
+nilpotent-type roots ($J = 0$) number 14.
+\end{proposition}
+
+\begin{proof}
+Direct enumeration.  For long roots $\pm e_i \pm e_j$:
+$J = (\pm 1) + (\pm 1) + 0 + 0$ when $i,j \le 2$, etc.
+For type~B short roots $\tfrac{1}{2}(\pm 1)^4$ with even negatives:
+$J = \tfrac{1}{2}(4), \tfrac{1}{2}(0), \tfrac{1}{2}(-4)$ for 0, 2, 4
+negatives respectively, giving $J \in \{+2, 0, -2\}$.
+The remaining cases follow similarly.
+\end{proof}
+
+\subsection{Idempotent Classification}
+\label{sec:idempotent}
+
+The Jordan trace classifies $F_4$ roots by their algebraic type in
+$J_3(\OO)$:
+
+\begin{definition}[Root classification]
+\label{def:root_class}
+An $F_4$ root $\beta$ is classified as:
+\begin{itemize}
+\item \textbf{Nilpotent}: $\abs{J(\beta)} < 0.01$,
+\item \textbf{Primitive}: $0.01 \le \abs{J(\beta)} < 0.5$,
+\item \textbf{Idempotent}: $\abs{\abs{J(\beta)} - 1} < 0.1$,
+\item \textbf{Regular}: otherwise.
+\end{itemize}
+\end{definition}
+
+\subsection{F4 Character Weights}
+\label{sec:character}
+
+\begin{definition}[F4 character]
+\label{def:f4char}
+For an $F_4$ root $\beta_j$ with Weyl height
+$h(\beta_j) = \sum_{i=1}^4 \abs{(\beta_j)_i}$, define:
+\begin{equation}
+\label{eq:character}
+\chi(\beta_j) =
+\begin{cases}
+2(1 + 0.1 \cdot h(\beta_j)) & \text{if $\beta_j$ is long}, \\
+1 + 0.1 \cdot h(\beta_j) & \text{if $\beta_j$ is short}.
+\end{cases}
+\end{equation}
+\end{definition}
+
+\begin{remark}
+The factor of 2 for long roots reflects their larger contribution to the
+adjoint representation of $F_4$ ($\dim = 52$).  The Weyl height
+modulation $0.1 \cdot h$ provides a mild position-dependent weighting
+within the Weyl chamber.  For long roots with $h = 2$ (e.g.,
+$e_1 + e_2$), the character is $2(1 + 0.2) = 2.4$.  For short type~A
+roots with $h = 1$ (e.g., $e_1$), it is $1.1$.
+\end{remark}
+
+\subsection{Plasma Colormap for F4 Grid}
+\label{sec:plasma}
+
+The F4 crystalline grid visualization maps the Jordan trace
+$J \in [-2, +2]$ to an RGB color via the \texttt{plasma} colormap
+\cite{matplotlib2007}:
+\begin{equation}
+\text{color}(J) = \text{plasma}\!\left(\frac{\text{clamp}(J,\, -2,\, 2) + 2}{4}\right),
+\end{equation}
+where $\text{plasma}(t)$ for $t \in [0,1]$ interpolates from deep
+indigo ($t = 0$, $J = -2$) through magenta to bright yellow
+($t = 1$, $J = +2$).  We use a hardcoded 256-entry RGB lookup table
+generated from \texttt{matplotlib.cm.plasma}.
+
+% ================================================================
+\section{The F4 Exceptional Fourier Transform}
+\label{sec:spectral}
+% ================================================================
+
+\subsection{Definition}
+\label{sec:eft_def}
+
+The F4-EFT decomposes the prime gap signal into 48 spectral
+components indexed by $F_4$ roots.
+
+\begin{definition}[F4-EFT]
+\label{def:f4eft}
+Given $N$ consecutive normalized gaps
+$\tilde{g}_0, \ldots, \tilde{g}_{N-1}$ with $E_8$ root assignments
+$\iota_0, \ldots, \iota_{N-1}$, the \emph{F4 Exceptional Fourier
+Transform} is the 48-component complex vector:
+\begin{equation}
+\label{eq:f4eft}
+\hat{E}_{F_4}(j) = \sum_{\substack{n=0 \\ f(\iota_n) = j}}^{N-1}
+(\tilde{g}_n - 1) \cdot \chi(\beta_j)
+\cdot \exp\!\left(i \cdot \frac{2\pi \norm{\beta_j}}{\sqrt{2}} \cdot \frac{n}{N}\right),
+\quad j = 0, \ldots, 47,
+\end{equation}
+where $f(\iota_n)$ is the $F_4$ index of $E_8$ root $\iota_n$ (under
+the mapping of \cref{def:e8f4map}), and $\chi$ is the $F_4$ character
+\eqref{eq:character}.
+\end{definition}
+
+\begin{remark}
+Key features of the F4-EFT:
+\begin{itemize}
+\item The factor $(\tilde{g}_n - 1)$ subtracts the expected mean gap
+  under the PNT, so the EFT measures deviations from uniformity.
+\item The phase $\theta_j(n) = 2\pi \norm{\beta_j} / \sqrt{2} \cdot n/N$
+  encodes a time-dependent sweep modulated by the $F_4$ root norm.
+  For long roots ($\norm{\beta_j} = \sqrt{2}$), the phase completes
+  one full cycle over $N$ gaps.  For short roots ($\norm{\beta_j} = 1$),
+  the phase completes $1/\sqrt{2} \approx 0.707$ cycles.
+\item Each gap contributes only to the bin of its specific $F_4$ root
+  $f(\iota_n)$, not to all 48 components.
+\end{itemize}
+\end{remark}
+
+\subsection{Power Spectrum and Jordan Decomposition}
+
+The \emph{F4 power spectrum} is:
+\begin{equation}
+\mathcal{P}(j) = \abs{\hat{E}_{F_4}(j)}^2, \quad j = 0, \ldots, 47.
+\end{equation}
+
+The \emph{Jordan decomposition} groups the spectrum into 12 bins by
+Jordan trace value:
+\begin{equation}
+\hat{D}_k = \sum_{j : J(\beta_j) \in B_k} \hat{E}_{F_4}(j),
+\quad k = 0, \ldots, 11,
+\end{equation}
+where $B_0 = [-3, -2.5), B_1 = [-2.5, -2), \ldots, B_{11} = [2.5, 3)$.
+
+\subsection{Phase-Lock Analysis}
+\label{sec:phaselock}
+
+The F4-EFT phase structure is characterized by four metrics:
+
+\begin{definition}[Phase-lock diagnostics]
+\label{def:phaselock}
+\begin{align}
+\text{Phase coherence:} \quad C &= \abs{\frac{1}{48} \sum_{j=0}^{47} e^{i \arg \hat{E}_{F_4}(j)}}, \\
+\text{Power entropy:} \quad H &= -\sum_{j=0}^{47} p_j \ln p_j \,\Big/\, \ln 48,
+  \quad p_j = \mathcal{P}(j) / \textstyle\sum_k \mathcal{P}(k), \\
+\text{Long/short ratio:} \quad R &= \frac{\sum_{j \in \mathcal{L}} \mathcal{P}(j)}
+  {\sum_{j \in \mathcal{S}} \mathcal{P}(j)}, \\
+\text{Jordan peak trace:} \quad J^* &= \arg\max_k \abs{\hat{D}_k}^2.
+\end{align}
+The system is \emph{phase-locked} if $C > 0.3$ and has
+\emph{Jordan structure} if $\max_k \abs{\hat{D}_k}^2 > 2 \cdot \text{mean}_k \abs{\hat{D}_k}^2$.
+\end{definition}
+
+\subsection{The Salem--Jordan Kernel}
+\label{sec:salem}
+
+\begin{definition}[Salem--Jordan kernel]
+\label{def:salem}
+For temperature parameter $\tau = 0.5$, the kernel applied to spectral
+magnitude $m \ge 0$ is:
+\begin{equation}
+\label{eq:salem}
+K_J(m, \tau) = \frac{52 - 4m^2}{52}
+\cdot \frac{1}{e^{m/\tau} + 1}.
+\end{equation}
+The Fermi--Dirac factor provides exponential suppression for large
+magnitudes.  The character factor $(52 - 4m^2)/52$ approximates the
+$F_4$ adjoint trace near the identity: $\chi_{F_4}(e^{x/\tau}) \approx
+52 - 4\abs{x}^2$.
+\end{definition}
+
+\subsection{Crystalline Vertex Extraction}
+\label{sec:vertices}
+
+\begin{definition}[Crystalline vertex score]
+\label{def:vertex_score}
+For gap index $n$ mapping to $F_4$ root $j = f(\iota_n)$:
+\begin{equation}
+\label{eq:vertex_score}
+\sigma(n) =
+\begin{cases}
+2 \cdot \mathcal{P}(j) &
+  \text{if } \abs{\abs{J(\beta_j)} - 1} < 0.2 \quad
+  \text{(idempotent boost)}, \\
+\mathcal{P}(j) & \text{otherwise}.
+\end{cases}
+\end{equation}
+The top $V$ gap indices by $\sigma(n)$ are the \emph{crystalline
+vertices}.
+\end{definition}
+
+\begin{remark}
+The idempotent boost doubles the score for roots with
+$\abs{J} \approx 1$ (i.e., idempotent elements of $J_3(\OO)$).
+By \cref{prop:jtrace_values}, 16 of the 48 $F_4$ roots qualify.
+Selection uses a min-heap of size $V$ for $O(N \log V)$ extraction.
+\end{remark}
+
+% ================================================================
+\section{E8 Lattice Decoding}
+\label{sec:decoder}
+% ================================================================
+
+\subsection{Gap Embedding into $\R^8$}
+\label{sec:gap_embed}
+
+Given 8 consecutive primes $p_n, p_{n+1}, \ldots, p_{n+7}$ and the
+preceding prime $p_{n-1}$, we compute 8 gaps
+$g_i = p_{n+i} - p_{n+i-1}$ for $i = 0, \ldots, 7$.  The embedding is:
+\begin{equation}
+\label{eq:embedding}
+v = \frac{\sqrt{2}}{\sqrt{8} \cdot \sigma_g}
+\cdot (g - \bar{g}),
+\end{equation}
+where $\bar{g} = \frac{1}{8}\sum_{i} g_i$ is the mean and
+$\sigma_g = \sqrt{\frac{1}{8}\sum_i (g_i - \bar{g})^2}$ is the
+standard deviation.  This normalizes $v$ to have typical norm
+$\approx \sqrt{2}$, the $E_8$ root length.
+
+\subsection{Closest Vector Decoding}
+\label{sec:cvp}
+
+The $E_8$ lattice is $\Lambda_{E_8} = D_8 \cup (D_8 + c)$, where:
+\begin{itemize}
+\item $D_8 = \{x \in \Z^8 : \sum x_i \equiv 0 \pmod{2}\}$
+  (checkerboard lattice).
+\item $c = (\tfrac{1}{2}, \ldots, \tfrac{1}{2})$.
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{E8 Closest Vector Decoding}
+\label{alg:cvp}
+\begin{algorithmic}[1]
+\Require Input vector $v \in \R^8$
+\Ensure Nearest $E_8$ lattice point $\lambda^*$ and distance $d^*$
+\Statex
+\State \textbf{Integer sublattice:} $z \gets \text{round}(v)$
+\If{$\sum z_i$ is odd}
+  \State $k \gets \arg\max_i \abs{v_i - z_i}$
+  \Comment{Largest rounding error}
+  \State $z_k \gets z_k + \sgn(v_k - z_k)$
+  \Comment{Flip parity}
+\EndIf
+\State $d_1 \gets \norm{v - z}$
+\Statex
+\State \textbf{Half-integer sublattice:} $w \gets \text{round}(v - c)$
+\If{$\sum w_i$ is odd}
+  \State $k \gets \arg\max_i \abs{(v_i - \tfrac{1}{2}) - w_i}$
+  \State $w_k \gets w_k + \sgn((v_k - \tfrac{1}{2}) - w_k)$
+\EndIf
+\State $y \gets w + c$; $d_2 \gets \norm{v - y}$
+\Statex
+\State \Return $(z, d_1)$ if $d_1 \le d_2$, else $(y, d_2)$
+\end{algorithmic}
+\end{algorithm}
+
+The packing radius of $E_8$ is $R_{\text{pack}} = 1/\sqrt{2} \approx 0.7071$.
+Blocks with decoding error $d^* < R_{\text{pack}}$ are \emph{correctable}.
+
+\subsection{Bit Extraction via $E_8/2E_8$}
+\label{sec:bits}
+
+The quotient $E_8 / 2E_8 \cong \F_2^4$ is isomorphic to the
+extended Hamming code $\mathcal{H}_8$ \cite{conway1999,ebeling2013}.
+From the lattice point $\lambda^* = (y_1, \ldots, y_8)$
+(translated to integers if half-integer), we extract 4 bits:
+\begin{align}
+m_1 &= (y_1 + y_2 + y_3 + y_4) \bmod 2, \\
+m_2 &= (y_1 + y_2 + y_5 + y_6) \bmod 2, \\
+m_3 &= (y_1 + y_3 + y_5 + y_7) \bmod 2, \\
+m_4 &= y_1 \bmod 2.
+\end{align}
+These correspond to the generator matrix of the $[8,4,4]$ extended
+Hamming code.  Each block of 8 primes yields 4 bits.  Pairs of
+consecutive nibbles $(m_1 m_2 m_3 m_4)$ can be assembled into bytes
+in either high--low or low--high order.
+
+% ================================================================
+\section{Multi-Method Decoder}
+\label{sec:multi_decoder}
+% ================================================================
+
+We implement twelve independent methods for extracting structured
+information from the prime gap sequence, organized in five groups.
+Each method produces a byte stream that is evaluated for non-random
+structure.
+
+\subsection{Group 1: E8 Lattice Decoding}
+
+\begin{enumerate}[label=\textbf{M\arabic*}]
+\item \textbf{Hamming 4-bit (high--low pairing)}: The standard
+  $E_8/2E_8$ extraction of \cref{sec:bits}, with consecutive nibbles
+  assembled as $(n_{2k} \ll 4) \mathbin{|} n_{2k+1}$.
+  Rate: $\tfrac{1}{2}$ byte per block of 8 primes.
+
+\item \textbf{Hamming 4-bit (low--high pairing)}: Same extraction,
+  opposite nibble ordering: $(n_{2k+1} \ll 4) \mathbin{|} n_{2k}$.
+
+\item \textbf{Hamming 4-bit (low-error only)}: Restricts to
+  correctable blocks ($d^* < 1/\sqrt{2}$).
+
+\item \textbf{Hamming raw bits}: The 4-bit stream packed into bytes
+  (MSB first), without nibble pairing.
+
+\item \textbf{E8 sign bits}: For each block, record
+  $\text{bit}_k = [y_k \ge 0]$ for $k = 1, \ldots, 8$.
+  Rate: 1 byte per block.
+
+\item \textbf{Sublattice flag}: 1 bit per block indicating integer
+  ($0$) or half-integer ($1$) sublattice.
+  Rate: $\tfrac{1}{8}$ byte per block.
+
+\item \textbf{E8 parity bits}: $\text{bit}_k = y_k \bmod 2$ for each
+  coordinate.  Rate: 1 byte per block.
+\end{enumerate}
+
+\subsection{Group 2: E8 Root Assignment}
+
+\begin{enumerate}[resume,label=\textbf{M\arabic*}]
+\item \textbf{E8 root index mod 256}: For each gap $n$, output
+  $\iota(\tilde{g}_n) \bmod 256$ as a byte.
+  Rate: 1 byte per gap.
+
+\item \textbf{E8 projection slope (quantized)}: Map the projection
+  slope $s \in [-10, 10]$ to $[0, 255]$ via
+  $\lfloor 255 \cdot (s + 10) / 20 \rfloor$.
+\end{enumerate}
+
+\subsection{Group 3: Raw Gap Properties}
+
+\begin{enumerate}[resume,label=\textbf{M\arabic*}]
+\item \textbf{Gap value mod 256}: Direct gap size $g_n \bmod 256$.
+
+\item \textbf{Gap/2 mod 256}: $(g_n / 2) \bmod 256$ (gaps are even
+  for $p > 2$).
+
+\item \textbf{Normalized gap (quantized)}: Map
+  $\tilde{g}_n \in [0, 4]$ to $[0, 255]$.
+\end{enumerate}
+
+\subsection{Group 4: F4 Sub-harmonic}
+
+\begin{enumerate}[resume,label=\textbf{M\arabic*}]
+\item \textbf{F4 root index}: For F4-mapped gaps, the F4 root index
+  $(0\text{--}47)$ as a byte.
+
+\item \textbf{F4 root index mod 26}: Map to letters A--Z via
+  $65 + (j \bmod 26)$.
+
+\item \textbf{Jordan trace classification bits}: 2 bits per F4 gap:
+  bit~0 = $[J > 0]$, bit~1 = $[\abs{J} > 1]$.
+\end{enumerate}
+
+\subsection{Group 5: Crystalline Vertices}
+
+\begin{enumerate}[resume,label=\textbf{M\arabic*}]
+\item \textbf{Vertex gap values}: Gap sizes $g_n$ at the $V$
+  crystalline vertex positions, mod 256.
+
+\item \textbf{Vertex gaps mod 26}: Same, mapped to A--Z.
+
+\item \textbf{Vertex spacing}: Differences between consecutive
+  sorted vertex positions, mod 256.
+
+\item \textbf{Vertex prime values mod 256}: The prime $p_{n+1}$ at
+  each vertex position, mod 256.
+\end{enumerate}
+
+\subsection{Statistical Evaluation}
+\label{sec:stats}
+
+Each method's output byte stream is evaluated by:
+
+\begin{definition}[Decoder metrics]
+\label{def:metrics}
+\begin{itemize}
+\item \textbf{Shannon entropy}: $H = -\sum_{b=0}^{255} p_b \log_2 p_b$
+  bits per byte (max 8.0 for uniform).
+\item \textbf{Chi-square $p$-value}: Test byte frequencies against
+  uniform $U(0, 255)$ with 255 degrees of freedom, using normal
+  approximation $z = (\chi^2 - 255)/\sqrt{510}$.
+\item \textbf{Longest printable run}: Maximum contiguous substring
+  of bytes in the printable ASCII range $[32, 126]$.
+\end{itemize}
+\end{definition}
+
+A stream showing non-random structure would exhibit: low entropy
+($H \ll 8$), small $p$-value ($p \ll 0.05$), and/or long printable
+runs ($\gg 10$ characters forming readable text).
+
+% ================================================================
+\section{Computational Implementation}
+\label{sec:implementation}
+% ================================================================
+
+\subsection{Prime Data}
+
+Primes are loaded from external files \texttt{primes1.txt} through
+\texttt{primes50.txt} (generated by
+\texttt{primesieve}\footnote{\url{https://primesieve.org/}}).  Each
+file contains whitespace-separated integers with a header line.  The
+loader skips the header (detected by the presence of alphabetic
+characters), parses all integers $> 1$, and stops at the requested
+maximum.
+
+\subsection{Self-Contained C Implementation}
+\label{sec:c_impl}
+
+The F4 crystalline grid is implemented as a single C source file
+(\texttt{f4\_crystalline\_grid.c}, $\sim$600 lines) that produces
+a PPM image with no external dependencies beyond \texttt{libm} and
+OpenMP.  The full pipeline:
+
+\begin{algorithm}[H]
+\caption{F4 Crystalline Grid (C/OpenMP)}
+\label{alg:pipeline}
+\begin{algorithmic}[1]
+\Require \texttt{--max-primes} $N$, \texttt{--n-vertices} $V$,
+  \texttt{--size} $S$
+\Ensure PPM image file
+\State Generate 240 $E_8$ roots, 48 $F_4$ roots
+  \Comment{$O(1)$}
+\State Build $E_8 \to F_4$ mapping (cosine similarity)
+  \Comment{$O(240 \times 48)$}
+\State Load primes from files
+  \Comment{$O(N)$}
+\For{each gap $n = 0, \ldots, N-2$ \textbf{(OpenMP parallel)}}
+  \State $g_n \gets p_{n+1} - p_n$;
+    $\tilde{g}_n \gets g_n / \max(\log p_n, 1)$
+  \State $\iota_n \gets \lfloor 240 \cdot (\sqrt{\max(\tilde{g}_n, 0.01)}/\sqrt{2} \bmod 1) \rfloor$
+  \State $j_n \gets f(\iota_n)$ (F4 index);
+    $J_n \gets J(\beta_{j_n})$ (Jordan trace)
+\EndFor
+\State Compute F4-EFT spectrum (48 complex components)
+  \Comment{Serial, $O(N)$}
+\State Compute vertex scores $\sigma(n)$ with idempotent boost
+  \Comment{OpenMP}
+\State Select top $V$ by min-heap
+  \Comment{$O(N \log V)$}
+\State Compute Ulam coordinates $u(p_n)$ for all $n$
+  \Comment{OpenMP}
+\State Allocate $S \times S \times 3$ pixel buffer (black)
+\State Plot F4 primes: map $J_n \in [-2,2]$ to plasma LUT
+  \Comment{OpenMP}
+\State Draw white circles with yellow edges at vertex positions
+\State Write P6 PPM
+\end{algorithmic}
+\end{algorithm}
+
+\begin{remark}[Memory estimate]
+For $N = 2 \times 10^6$ primes:
+primes (16~MB), gaps + normalized gaps (32~MB), E8/F4 assignments
+(8~MB), scores (16~MB), Ulam coordinates (16~MB), pixel buffer at
+$6000^2 \times 3$ (108~MB).  Total: $\approx 200$~MB.
+For $N = 5 \times 10^7$: $\approx 2$~GB.  For $N = 10^8$:
+$\approx 4$~GB.
+\end{remark}
+
+\subsection{Python F4 Analysis Pipeline}
+
+The Python implementation (\texttt{e8\_f4\_prime\_analysis.py})
+provides the reference pipeline using NumPy, with supporting modules:
+
+\begin{itemize}
+\item \texttt{f4\_lattice.py}: $F_4$ root generation, $E_8 \to F_4$
+  mapping, Cartan matrix, character precomputation.
+\item \texttt{jordan\_algebra.py}: Octonion multiplication table,
+  Albert algebra $J_3(\OO)$, Jordan trace, Cayley plane projection.
+\item \texttt{f4\_eft.py}: F4-EFT computation, phase-lock analysis,
+  crystalline vertex extraction.
+\item \texttt{salem\_jordan.py}: Salem--Jordan kernel, Fermi--Dirac
+  filter, adaptive $\tau$ selection, spectral filtering.
+\end{itemize}
+
+\subsection{Multi-Method Decoder Implementation}
+
+The decoder (\texttt{e8\_multi\_decoder.py}) imports from both the
+F4 analysis pipeline and the E8 lattice decoder
+(\texttt{e8\_prime\_decoder.py}).  It runs all 19 base methods plus
+first-$N$ filtered variants (first 100 and first 1000 bytes of each),
+totaling 53+ method variants evaluated in a single pass.
+
+\subsection{Build System}
+
+\begin{lstlisting}[language=make,caption={Makefile targets}]
+CC = gcc
+CFLAGS = -O3 -march=native -Wall -fopenmp
+
+f4_crystalline_grid: f4_crystalline_grid.c
+	$(CC) $(CFLAGS) -o $@ $< -lm
+
+run-crystal:
+	./f4_crystalline_grid --max-primes 2000000 --n-vertices 38
+
+run-decoder:
+	python3 e8_multi_decoder.py --max-primes 2000000
+\end{lstlisting}
+
+The PPM output is converted to PNG via ImageMagick:
+\texttt{convert grid.ppm grid.png}.
+
+% ================================================================
+\section{Results}
+\label{sec:results}
+% ================================================================
+
+\subsection{F4 Crystalline Grid ($N = 2{,}000{,}000$ primes)}
+
+Running \texttt{f4\_crystalline\_grid --max-primes 2000000 --n-vertices 38}
+produces the following:
+
+\begin{table}[h]
+\centering
+\caption{F4 Crystalline Grid: summary statistics ($N = 2 \times 10^6$)}
+\label{tab:f4grid}
+\begin{tabular}{lr}
+\toprule
+\textbf{Quantity} & \textbf{Value} \\
+\midrule
+Primes loaded & 2{,}000{,}000 \\
+Prime range & 2 to 32{,}452{,}843 \\
+Total gaps & 1{,}999{,}999 \\
+$E_8$ roots & 240 \\
+$F_4$ roots & 48 \\
+$E_8$ roots passing $F_4$ threshold & 240 (100\%) \\
+Gaps mapping to $F_4$ & 1{,}999{,}999 (100.0\%) \\
+Crystalline vertices selected & 38 \\
+Ulam coordinate range & $x \in [-2848, 2848]$, $y \in [-2848, 2848]$ \\
+Image size & $6000 \times 6000$ pixels \\
+PPM file size & 103 MB \\
+PNG file size (after conversion) & 2.4 MB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The 100\% F4 mapping fraction confirms \cref{thm:f4complete}: every
+$E_8$ root projects to an $F_4$ root with cosine similarity $1.0$.
+
+\subsection{Multi-Method Decoder Results ($N = 100{,}000$ primes)}
+
+The decoder evaluated 53 method variants.  \cref{tab:decoder_top}
+shows the methods ranked by longest printable ASCII run,
+and \cref{tab:decoder_entropy} ranks by lowest entropy.
+
+\begin{table}[h]
+\centering
+\caption{Top methods by longest printable ASCII run}
+\label{tab:decoder_top}
+\begin{tabular}{rlrrr}
+\toprule
+\textbf{\#} & \textbf{Method} & \textbf{Bytes} & \textbf{MaxRun} & \textbf{Entropy} \\
+\midrule
+14 & F4 root index mod 26 (letter) & 85{,}502 & 85{,}502 & 3.541 \\
+13 & F4 root index (F4 gaps only) & 85{,}502 & 46 & 3.693 \\
+12 & Normalized gap (quantized) & 99{,}999 & 20 & 6.701 \\
+ 9 & E8 projection slope (quantized) & 99{,}999 & 11 & 2.131 \\
+ 8 & E8 root index mod 256 & 99{,}999 & 11 & 7.266 \\
+ 3 & Hamming 4-bit (low-error) & 1{,}335 & 9 & 7.845 \\
+ 2 & Hamming 4-bit (low--high) & 6{,}249 & 9 & 7.950 \\
+ 1 & Hamming 4-bit (high--low) & 6{,}249 & 8 & 7.950 \\
+15 & Jordan trace class.\ bits & 21{,}375 & 8 & 3.911 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Top methods by lowest entropy (most structure)}
+\label{tab:decoder_entropy}
+\begin{tabular}{rlrrr}
+\toprule
+\textbf{\#} & \textbf{Method} & \textbf{Bytes} & \textbf{Entropy} & \textbf{$\chi^2$ $p$} \\
+\midrule
+17 & Vertex gaps mod 26 (letters) & 500 & 0.118 & 0.000 \\
+16 & Vertex gap values mod 256 & 500 & 0.128 & 0.000 \\
+ 9 & E8 projection slope & 99{,}999 & 2.131 & 0.000 \\
+ 7 & E8 parity bits & 12{,}499 & 3.196 & 0.000 \\
+14 & F4 root index mod 26 & 85{,}502 & 3.541 & 0.000 \\
+13 & F4 root index (F4 only) & 85{,}502 & 3.693 & 0.000 \\
+15 & Jordan trace class.\ bits & 21{,}375 & 3.911 & 0.000 \\
+10 & Gap value mod 256 & 99{,}999 & 3.943 & 0.000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Analysis of Decoder Results}
+
+\paragraph{Hamming methods (M1--M4).}
+Entropy $\approx 7.95$ bits/byte, indistinguishable from random.
+The chi-square $p$-value is $< 0.01$, indicating a slight deviation
+from uniformity in the nibble distribution, but the entropy is so
+close to the maximum of 8.0 that no meaningful structure is present.
+The longest printable runs (8--9 characters) are consistent with
+random expectation for streams of $\sim$6{,}000 bytes.
+
+\paragraph{Projection slope (M9).}
+Entropy $2.13$ bits/byte reflects the fact that the slope takes only a
+small number of distinct values ($\{-10, -2, -1, 0, 1, 2, 10\}$
+for the 240 roots), so the quantized byte values cluster around
+a few values (notably \texttt{0x72}, \texttt{0x7F}, \texttt{0x8C},
+\texttt{0xFF}, \texttt{0x00}).  This is a consequence of the E8 root
+geometry, not of prime structure.
+
+\paragraph{F4 root index (M13--M14).}
+Entropy $3.5$--$3.7$ bits/byte.  Since there are only 48 $F_4$ root
+indices, the maximum possible entropy is $\log_2 48 \approx 5.6$
+bits; the observed value indicates non-uniform distribution across
+the 48 roots.  When mapped to letters A--Z (mod 26), the entire
+85{,}502-byte stream is ``printable'' by construction, but the
+resulting text is not readable English.
+
+\paragraph{Vertex gap values (M16--M17).}
+Entropy $0.12$--$0.13$ bits/byte---the lowest of all methods.
+This is because crystalline vertices are selected for maximal F4
+power spectrum, and the corresponding gaps cluster around a few
+values.  With only 500 bytes, the low entropy reflects the vertex
+selection criterion rather than an encoded message.
+
+\paragraph{Parity bits (M7).}
+Entropy $3.20$ bits/byte.  The low entropy arises because most $E_8$
+lattice point coordinates are small integers ($0$ or $\pm 1$), so
+parity is highly non-uniform.
+
+\subsection{Performance}
+
+\begin{table}[h]
+\centering
+\caption{Runtime for $N = 2 \times 10^6$ primes on Intel Core Ultra 9 275HX}
+\label{tab:perf}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Program} & \textbf{Time} & \textbf{Output} \\
+\midrule
+\texttt{f4\_crystalline\_grid} (C/OpenMP) & $< 5$ s & 103 MB PPM \\
+ImageMagick \texttt{convert} PPM $\to$ PNG & $\sim 2$ s & 2.4 MB PNG \\
+\texttt{e8\_multi\_decoder.py} ($10^5$ primes) & 3.6 s & 53 methods \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ================================================================
+\section{Octonion Arithmetic}
+\label{sec:octonions}
+% ================================================================
+
+The Jordan algebra module implements full octonion arithmetic
+as the algebraic foundation for the $F_4$-Albert algebra connection.
+
+\subsection{Multiplication Table}
+
+The octonions $\OO$ are an 8-dimensional non-associative algebra
+with basis $\{1, e_1, \ldots, e_7\}$ and multiplication:
+$e_i \cdot e_j = f_{ijk} \, e_k$, where $f_{ijk}$ are the structure
+constants given by the Cayley--Dickson construction.  The multiplication
+table is:
+\begin{equation}
+\text{MULT\_TABLE}[i][j] = k, \qquad
+\text{MULT\_SIGNS}[i][j] = \pm 1,
+\end{equation}
+such that $e_i \cdot e_j = \text{MULT\_SIGNS}[i][j] \cdot e_{\text{MULT\_TABLE}[i][j]}$.
+
+The full $8 \times 8$ sign matrix is:
+\begin{equation}
+\text{SIGNS} =
+\begin{pmatrix}
++ & + & + & + & + & + & + & + \\
++ & - & + & - & + & - & - & + \\
++ & - & - & + & + & + & - & - \\
++ & + & - & - & + & - & + & - \\
++ & - & - & - & - & + & + & + \\
++ & + & - & + & - & - & + & - \\
++ & + & + & - & - & - & - & + \\
++ & - & + & + & - & + & - & -
+\end{pmatrix}
+\end{equation}
+
+Operations implemented:
+\begin{itemize}
+\item Addition, subtraction (componentwise).
+\item Multiplication: $\OO \times \OO \to \OO$ via
+  $(a \cdot b)_k = \sum_{i,j} f_{ijk} \, a_i \, b_j$
+  ($O(64)$ multiplications).
+\item Conjugation: $\bar{a} = a_0 - \sum_{k=1}^7 a_k e_k$.
+\item Norm: $\norm{a} = \sqrt{a_0^2 + \cdots + a_7^2}$.
+\end{itemize}
+
+\subsection{Albert Algebra Product}
+
+The Albert algebra $J_3(\OO)$ supports the Jordan product
+$X \circ Y = (XY + YX)/2$, computed as:
+\begin{equation}
+(X \circ Y)_{ii} = X_{ii} Y_{ii} + \text{Re}(X_{jk} \overline{Y_{jk}})
+  + \text{Re}(X_{ki} \overline{Y_{ki}}),
+\end{equation}
+where $(i,j,k)$ is a cyclic permutation of $(1,2,3)$.
+
+\subsection{Cayley Plane Projection}
+
+The Cayley plane $\OO P^2$ is a 16-dimensional manifold on which
+$F_4$ acts.  For visualization, we project $F_4$ roots to polar
+coordinates $(r, \theta)$ via:
+\begin{align}
+z &= b_1 + i \, b_2, \quad w = b_3 + i \, b_4, \\
+r &= \sqrt{\abs{z}^2 + \abs{w}^2}, \quad
+\theta = \arctan\!\left(\frac{\text{Im}(z) + \text{Im}(w)}
+  {\text{Re}(z) + \text{Re}(w)}\right).
+\end{align}
+
+% ================================================================
+\section{Discussion}
+\label{sec:discussion}
+% ================================================================
+
+\subsection{What the Patterns Are}
+
+The ring structure in the E8 slope visualization arises from the
+interplay of two effects:
+
+\begin{enumerate}
+\item \textbf{Gap periodicity in root space}: The map
+  $\tilde{g} \mapsto \varphi(\tilde{g})$ wraps the normalized gap
+  around the circle $[0, 1)$ via a square-root scaling.  As one moves
+  outward in the Ulam spiral, the typical gap size grows
+  (logarithmically), causing the phase to advance and the assigned
+  slope to cycle.
+
+\item \textbf{Ulam spiral geometry}: Primes at similar distances from
+  the center tend to have similar magnitudes and hence similar
+  normalized gaps, producing coherent coloring in annular regions.
+\end{enumerate}
+
+The 100\% F4 mapping (\cref{thm:f4complete}) means that the F4
+crystalline grid visualizes \emph{all} prime gaps, not a filtered
+subset.  The crystalline vertices select gaps where the F4-EFT power
+spectrum is concentrated, boosted by the idempotent condition on the
+Jordan trace.
+
+\subsection{What the Patterns Are Not}
+
+\begin{itemize}
+\item The E8 root assignment is a \emph{deterministic function of the
+  gap size alone}.  It encodes no deeper number-theoretic structure
+  beyond the normalized gap distribution.
+
+\item The ring structure would appear for \emph{any} sequence of
+  positive reals with similar statistical properties to prime gaps
+  (e.g., a Poisson process with rate $1/\log n$).
+
+\item The crystalline vertices are not ``special primes'' in any
+  number-theoretic sense.
+
+\item The multi-method decoder (\cref{sec:multi_decoder}) finds no
+  method producing readable text.  All methods either show
+  near-maximum entropy (random) or low entropy explained by the
+  algebraic structure of the mapping (small number of root types),
+  not by an encoded message.
+\end{itemize}
+
+\subsection{The Complete F4 Coverage Phenomenon}
+
+The result of \cref{thm:f4complete}---that all 240 $E_8$ roots
+project to $F_4$ with similarity $1.0$---deserves comment.  This is
+\emph{not} a generic feature of projections from $E_8$ to rank-4
+sublattices.  It holds specifically because:
+\begin{enumerate}
+\item The coordinate-aligned projection $(r_1, \ldots, r_8) \mapsto
+  (r_1, \ldots, r_4)$ sends each $E_8$ root type to an exact $F_4$
+  root type (long to long, short to short).
+\item The fallback to coordinates $(r_5, \ldots, r_8)$ catches the
+  roots concentrated entirely in the fiber, which again project
+  exactly to $F_4$ roots.
+\end{enumerate}
+A random $4$-dimensional projection of $E_8$ would typically yield
+far fewer exact $F_4$ matches.
+
+\subsection{Reproducibility}
+
+All source code is available at:
+\begin{center}
+\url{https://github.com/johnjanik/HodgedeRham}
+\end{center}
+The repository contains:
+\begin{itemize}
+\item \texttt{f4\_crystalline\_grid.c}: Self-contained C/OpenMP
+  renderer (PPM output, $\sim$600 lines, no dependencies beyond
+  \texttt{libm}).
+\item \texttt{e8\_multi\_decoder.py}: Multi-method decoder (12 base
+  methods $\times$ filtered variants = 53 total).
+\item \texttt{e8\_f4\_prime\_analysis.py}: Python F4 analysis pipeline.
+\item \texttt{f4\_lattice.py}, \texttt{jordan\_algebra.py},
+  \texttt{f4\_eft.py}, \texttt{salem\_jordan.py}: Supporting modules.
+\item \texttt{e8\_prime\_decoder.py}: E8 lattice decoder with
+  statistical tests.
+\item \texttt{Makefile}: Build and run targets.
+\end{itemize}
+Build with \texttt{gcc -O3 -march=native -fopenmp -lm}.
+
+% ================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% ================================================================
+
+We have presented a complete, reproducible pipeline for analyzing prime
+gap structure through the lens of exceptional Lie lattices.  The E8
+root assignment map transforms the scalar sequence of normalized prime
+gaps into a structured coloring of the Ulam spiral, and the F4
+restriction, Jordan trace, and Salem--Jordan filter extract a discrete
+``crystalline grid'' from the continuous ring pattern.
+
+The key structural result (\cref{thm:f4complete}) is that all 240
+$E_8$ roots project exactly to $F_4$ roots under the natural
+coordinate-aligned embedding, yielding 100\% F4 coverage of all
+prime gaps.
+
+The multi-method decoder finds no evidence of an encoded message in
+the prime gap data: all 53 extraction methods either produce
+near-random output (entropy $\approx 8$ bits/byte) or low-entropy
+output fully explained by the finite cardinality of root types.
+
+The mathematical objects involved---$E_8$, $F_4$, the Albert algebra
+$J_3(\OO)$, the Salem kernel---are among the most beautiful structures
+in mathematics.  Whether the observed patterns reflect deep connections
+to prime distribution or are primarily a consequence of projecting gap
+statistics onto a rich algebraic framework remains an open question.
+
+% ================================================================
+% Appendices
+% ================================================================
+
+\appendix
+
+\section{Complete E8 Root Enumeration}
+\label{app:roots}
+
+For reproducibility, we specify the exact enumeration order of the
+240 $E_8$ roots used in all computations.
+
+\textbf{Type~I} (roots 0--111): Iterate $i = 0, \ldots, 7$ and
+$j = i+1, \ldots, 7$.  For each pair $(i, j)$, enumerate the four sign
+patterns $(s_1, s_2) \in \{(-1,-1), (-1,+1), (+1,-1), (+1,+1)\}$.
+The root is $s_1 e_i + s_2 e_j$.
+
+\textbf{Type~II} (roots 112--239): Iterate $\text{mask} = 0, \ldots,
+255$.  For each mask, let
+$r_k = \tfrac{1}{2}$ if bit $k$ is set, $-\tfrac{1}{2}$ otherwise
+($k = 0, \ldots, 7$).  Keep only masks where the number of unset bits
+(negative signs) is even.  This yields 128 roots in mask order.
+
+\section{Complete F4 Root Enumeration}
+\label{app:f4roots}
+
+\textbf{Long roots} (indices 0--23): Iterate $i = 0, \ldots, 3$ and
+$j = i+1, \ldots, 3$.  For each pair, enumerate four sign patterns.
+
+\textbf{Short type~A} (indices 24--31): Iterate $i = 0, \ldots, 3$,
+signs $s \in \{-1, +1\}$.
+
+\textbf{Short type~B} (indices 32--39): Iterate mask $= 0, \ldots, 15$,
+keep even negative count.
+
+\textbf{Short type~C} (indices 40--47): Iterate mask $= 0, \ldots, 15$,
+keep odd negative count.
+
+\section{Plasma Colormap Table}
+\label{app:colormap}
+
+The 256-entry plasma LUT is generated from \texttt{matplotlib 3.8}:
+\begin{lstlisting}[language=Python]
+import matplotlib.cm as cm
+for i in range(256):
+    r, g, b, _ = cm.plasma(i / 255.0)
+    print(f"  {{{int(r*255)}, {int(g*255)}, {int(b*255)}}},")
+\end{lstlisting}
+The full table is embedded in \texttt{f4\_crystalline\_grid.c} and maps
+$t \in [0, 1]$ (derived from $J \in [-2, 2]$ via $t = (J+2)/4$)
+to an RGB triple.  The endpoints: $t=0$ maps to deep indigo (12, 7, 134);
+$t=1$ maps to bright yellow (239, 248, 33).
+
+\section{Decoder Method Cross-Reference}
+\label{app:decoder_xref}
+
+\begin{longtable}{cllc}
+\toprule
+\textbf{M\#} & \textbf{Method} & \textbf{Source function} & \textbf{Bits/gap} \\
+\midrule
+\endhead
+1 & Hamming high--low & \texttt{extract\_bits} + pair & 0.5 \\
+2 & Hamming low--high & \texttt{extract\_bits} + pair & 0.5 \\
+3 & Hamming low-error & \texttt{extract\_bits} + filter & 0.5 \\
+4 & Hamming raw bits & \texttt{extract\_bits} & 0.5 \\
+5 & Sign bits & \texttt{e8\_decode} signs & 1.0 \\
+6 & Sublattice flag & \texttt{e8\_decode} type & 0.125 \\
+7 & Parity bits & \texttt{e8\_decode} parities & 1.0 \\
+8 & Root index mod 256 & \texttt{assign\_root} & 1.0 \\
+9 & Projection slope & \texttt{projected\_slopes} & 1.0 \\
+10 & Gap mod 256 & raw gap & 1.0 \\
+11 & Gap/2 mod 256 & raw gap $/2$ & 1.0 \\
+12 & Normalized gap & $\tilde{g}$ quantized & 1.0 \\
+13 & F4 root index & \texttt{project\_e8\_to\_f4} & 1.0 \\
+14 & F4 mod 26 (letter) & F4 index $\bmod 26$ & 1.0 \\
+15 & Jordan trace bits & $J > 0$, $|J| > 1$ & 0.25 \\
+16 & Vertex gaps & crystalline selection & var. \\
+17 & Vertex mod 26 & crystalline + mod 26 & var. \\
+18 & Vertex spacing & $\Delta$(vertex positions) & var. \\
+19 & Vertex primes & $p$ at vertices & var. \\
+\bottomrule
+\end{longtable}
+
+% ================================================================
+% Bibliography
+% ================================================================
+
+\begin{thebibliography}{99}
+
+\bibitem{adams1996}
+J.~F.~Adams.
+\newblock \emph{Lectures on Exceptional Lie Groups}.
+\newblock University of Chicago Press, 1996.
+
+\bibitem{baez2002}
+J.~C.~Baez.
+\newblock The octonions.
+\newblock \emph{Bull.\ Amer.\ Math.\ Soc.}\ (N.S.), 39(2):145--205, 2002.
+
+\bibitem{conway1999}
+J.~H.~Conway and N.~J.~A.~Sloane.
+\newblock \emph{Sphere Packings, Lattices and Groups}.
+\newblock Springer, 3rd edition, 1999.
+
+\bibitem{cramer1936}
+H.~Cram\'er.
+\newblock On the order of magnitude of the difference between
+  consecutive prime numbers.
+\newblock \emph{Acta Arith.}, 2(1):23--46, 1936.
+
+\bibitem{ebeling2013}
+W.~Ebeling.
+\newblock \emph{Lattices and Codes}.
+\newblock Springer, 3rd edition, 2013.
+
+\bibitem{freudenthal1954}
+H.~Freudenthal.
+\newblock Beziehungen der $E_7$ und $E_8$ zur Oktavenebene, I--XI.
+\newblock \emph{Indag.\ Math.}, 16--25, 1954--1963.
+
+\bibitem{goldston2009}
+D.~A.~Goldston, J.~Pintz, and C.~Y.~Y{\i}ld{\i}r{\i}m.
+\newblock Primes in tuples I.
+\newblock \emph{Ann.\ Math.}, 170(2):819--862, 2009.
+
+\bibitem{humphreys1972}
+J.~E.~Humphreys.
+\newblock \emph{Introduction to Lie Algebras and Representation Theory}.
+\newblock Springer, 1972.
+
+\bibitem{jordan1934}
+P.~Jordan, J.~von Neumann, and E.~Wigner.
+\newblock On an algebraic generalization of the quantum mechanical
+  formalism.
+\newblock \emph{Ann.\ Math.}, 35(1):29--64, 1934.
+
+\bibitem{matplotlib2007}
+J.~D.~Hunter.
+\newblock Matplotlib: A 2D graphics environment.
+\newblock \emph{Comput.\ Sci.\ Eng.}, 9(3):90--95, 2007.
+
+\bibitem{maynard2015}
+J.~Maynard.
+\newblock Small gaps between primes.
+\newblock \emph{Ann.\ Math.}, 181(1):383--413, 2015.
+
+\bibitem{mccrimmon2004}
+K.~McCrimmon.
+\newblock \emph{A Taste of Jordan Algebras}.
+\newblock Springer, 2004.
+
+\bibitem{openmp2018}
+{OpenMP Architecture Review Board}.
+\newblock \emph{OpenMP Application Programming Interface, Version 5.0},
+  2018.
+
+\bibitem{salem1950}
+R.~Salem.
+\newblock Power series with integral coefficients.
+\newblock \emph{Duke Math.\ J.}, 12(2):153--172, 1945.
+
+\bibitem{springer1998}
+T.~A.~Springer.
+\newblock Jordan algebras and algebraic groups.
+\newblock \emph{Ergebnisse der Mathematik}, vol.~75. Springer, 1998.
+
+\bibitem{ulam1963}
+S.~M.~Ulam.
+\newblock A visual display of some properties of the distribution of
+  primes.
+\newblock \emph{Notices Amer.\ Math.\ Soc.}, 10:197, 1963.
+
+\bibitem{viazovska2017}
+M.~S.~Viazovska.
+\newblock The sphere packing problem in dimension~8.
+\newblock \emph{Ann.\ Math.}, 185(3):991--1015, 2017.
+
+\bibitem{zhang2014}
+Y.~Zhang.
+\newblock Bounded gaps between primes.
+\newblock \emph{Ann.\ Math.}, 179(3):1121--1174, 2014.
+
+\end{thebibliography}
+
+\end{document}
